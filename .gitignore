@@ -26,6 +26,7 @@ build-aux/m4/ltversion.m4
 build-aux/missing
 build-aux/compile
 build-aux/test-driver
+src/linalg/build-aux/*
 config.log
 config.status
 configure
@@ -116,3 +117,5 @@ test/cache/*
 
 libbitcoinconsensus.pc
 contrib/devtools/split-debug.sh
+
+src/linalg/liblinalg.pc
