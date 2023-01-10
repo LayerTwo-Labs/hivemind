@@ -183,6 +183,9 @@ enum opcodetype
     OP_NOP9 = 0xb8,
     OP_NOP10 = 0xb9,
 
+    // market
+    OP_MARKET = 0xc0,
+
     // template matching params
     OP_SMALLINTEGER = 0xfa,
     OP_PUBKEYS = 0xfb,
@@ -643,6 +646,8 @@ public:
 
     bool IsPayToScriptHash() const;
     bool IsPayToWitnessScriptHash() const;
+    bool IsMarketScript(std::vector<unsigned char> &) const;
+    bool IsMarketScript(void) const;
     bool IsWitnessProgram(int& version, std::vector<unsigned char>& program) const;
 
     /** Script formats for Drivechains */

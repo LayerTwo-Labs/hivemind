@@ -113,6 +113,7 @@ BITCOIN_CORE_H = \
   keystore.h \
   dbwrapper.h \
   limitedmap.h \
+  primitives/market.h \
   memusage.h \
   merkleblock.h \
   miner.h \
@@ -305,6 +306,8 @@ libbitcoin_consensus_a_SOURCES = \
   hash.cpp \
   hash.h \
   prevector.h \
+  primitives/market.cpp \
+  primitives/market.h \
   primitives/block.cpp \
   primitives/block.h \
   primitives/transaction.cpp \

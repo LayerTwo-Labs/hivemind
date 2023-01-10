@@ -140,6 +140,9 @@ const char* GetOpName(opcodetype opcode)
     case OP_NOP9                   : return "OP_NOP9";
     case OP_NOP10                  : return "OP_NOP10";
 
+    // market
+    case OP_MARKET                 : return "OP_MARKET";
+
     case OP_INVALIDOPCODE          : return "OP_INVALIDOPCODE";
 
     // Note:
@@ -233,6 +236,70 @@ bool CScript::IsWitnessProgram(int& version, std::vector<unsigned char>& program
         return true;
     }
     return false;
+}
+
+bool CScript::IsMarketScript(std::vector<unsigned char>& hashBytes) const
+{
+    if (size() < 2)
+       return false;
+
+    if (this->back() != OP_MARKET)
+       return false;
+
+    // TODO
+    // Move Market deserialization to market.cpp or validation.cpp
+    //marketObj *obj = marketObjCtr(*this);
+    //if (!obj)
+    //   return ret;
+
+    //if (obj->marketop == 'B') { /* branch */
+    //   ret = true;
+    //}
+    //else
+    //if (obj->marketop == 'D') {
+    //   marketDecision *ptr = (marketDecision *) obj;
+    //   hashBytes = vector<unsigned char> (ptr->keyID.begin(), ptr->keyID.end());
+    //   delete ptr;
+    //   ret = true;
+    //}
+    //else
+    //if (obj->marketop == 'L') { /* steal vote */
+    //   ret = true;
+    //}
+    //else
+    //if (obj->marketop == 'M') { /* market */
+    //   marketMarket *ptr = (marketMarket *) obj;
+    //   hashBytes = vector<unsigned char> (ptr->keyID.begin(), ptr->keyID.end());
+    //   delete ptr;
+    //   ret = true;
+    // }
+    //else
+    //if (obj->marketop == 'O') { /* outcome */
+    //   ret = true;
+    // }
+    // else
+    // if (obj->marketop == 'R') { /* reveal vote */
+    //   ret = true;
+    // }
+    // else
+    // if (obj->marketop == 'S') { /* sealed vote */
+    //   ret = true;
+    // }
+    // else
+    // if (obj->marketop == 'T') { /* trade */
+    //   marketTrade *ptr = (marketTrade *) obj;
+    //   hashBytes = vector<unsigned char> (ptr->keyID.begin(), ptr->keyID.end());
+    //   delete ptr;
+    //   ret = true;
+    //}
+
+    return true;
+}
+
+bool CScript::IsMarketScript(void) const
+{
+    std::vector<unsigned char> hashBytes;
+    return IsMarketScript(hashBytes);
 }
 
 bool CScript::IsWithdrawalBundleFailCommit(uint256& hashWithdrawalBundle) const
