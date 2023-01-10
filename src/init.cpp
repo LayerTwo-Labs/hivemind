@@ -258,6 +258,7 @@ void Shutdown()
         pcoinsdbview.reset();
         pblocktree.reset();
         psidechaintree.reset();
+        pmarkettree.reset();
     }
 #ifdef ENABLE_WALLET
     StopWallets();
@@ -1407,6 +1408,8 @@ bool AppInitMain()
     if (nSidechainTreeDBCache > (1 << 21) && !gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX))
         nSidechainTreeDBCache = (1 << 21);
     nTotalCache -= nSidechainTreeDBCache;
+    int64_t nMarketTreeDBCache = nTotalCache / 8;
+    nTotalCache -= nMarketTreeDBCache;
     int64_t nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23)); // use 25%-50% of the remainder for disk cache
     nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20); // cap total coins db cache
     nTotalCache -= nCoinDBCache;
@@ -1436,6 +1439,7 @@ bool AppInitMain()
                 pblocktree.reset();
                 pblocktree.reset(new CBlockTreeDB(nBlockTreeDBCache, false, fReset));
                 psidechaintree.reset(new CSidechainTreeDB(nSidechainTreeDBCache, false, fReset));
+                pmarkettree.reset(new CMarketTreeDB(nMarketTreeDBCache, false, fReset));
 
                 if (fReset) {
                     pblocktree->WriteReindexing(true);

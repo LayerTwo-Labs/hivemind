@@ -292,6 +292,7 @@ std::unique_ptr<CCoinsViewDB> pcoinsdbview;
 std::unique_ptr<CCoinsViewCache> pcoinsTip;
 std::unique_ptr<CBlockTreeDB> pblocktree;
 std::unique_ptr<CSidechainTreeDB> psidechaintree;
+std::unique_ptr<CMarketTreeDB> pmarkettree;
 
 enum FlushStateMode {
     FLUSH_STATE_NONE,

@@ -35,6 +35,7 @@
 class BMMCache;
 class CBlockIndex;
 class CBlockTreeDB;
+class CMarketTreeDB;
 class CSidechainTreeDB;
 class CChainParams;
 class CCoinsViewDB;
@@ -493,6 +494,9 @@ extern std::unique_ptr<CBlockTreeDB> pblocktree;
 
 /** Global variable that points to the active sidechain tree (protected by cs_main) */
 extern std::unique_ptr<CSidechainTreeDB> psidechaintree;
+
+/** Global variable that points to the active market tree (protected by cs_main) */
+extern std::unique_ptr<CMarketTreeDB> pmarkettree;
 
 /**
  * Return the spend height, which is one more than the inputs.GetBestBlock().

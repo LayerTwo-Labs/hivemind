@@ -34,6 +34,8 @@ static const char DB_LAST_BLOCK = 'l';
 static const char DB_LAST_SIDECHAIN_DEPOSIT = 'x';
 static const char DB_LAST_SIDECHAIN_WITHDRAWAL_BUNDLE = 'w';
 
+using namespace std;
+
 namespace {
 
 struct CoinEntry {
@@ -77,10 +79,10 @@ uint256 CCoinsViewDB::GetBestBlock() const {
     return hashBestChain;
 }
 
-std::vector<uint256> CCoinsViewDB::GetHeadBlocks() const {
-    std::vector<uint256> vhashHeadBlocks;
+vector<uint256> CCoinsViewDB::GetHeadBlocks() const {
+    vector<uint256> vhashHeadBlocks;
     if (!db.Read(DB_HEAD_BLOCKS, vhashHeadBlocks)) {
-        return std::vector<uint256>();
+        return vector<uint256>();
     }
     return vhashHeadBlocks;
 }
@@ -96,7 +98,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     uint256 old_tip = GetBestBlock();
     if (old_tip.IsNull()) {
         // We may be in the middle of replaying.
-        std::vector<uint256> old_heads = GetHeadBlocks();
+        vector<uint256> old_heads = GetHeadBlocks();
         if (old_heads.size() == 2) {
             assert(old_heads[0] == hashBlock);
             old_tip = old_heads[1];
@@ -108,7 +110,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     // A vector is used for future extensibility, as we may want to support
     // interrupting after partial writes from multiple independent reorgs.
     batch.Erase(DB_BEST_BLOCK);
-    batch.Write(DB_HEAD_BLOCKS, std::vector<uint256>{hashBlock, old_tip});
+    batch.Write(DB_HEAD_BLOCKS, vector<uint256>{hashBlock, old_tip});
 
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();) {
         if (it->second.flags & CCoinsCacheEntry::DIRTY) {
@@ -155,7 +157,7 @@ CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, bool fMemory, bool fWipe) : CDBWra
 }
 
 bool CBlockTreeDB::ReadBlockFileInfo(int nFile, CBlockFileInfo &info) {
-    return Read(std::make_pair(DB_BLOCK_FILES, nFile), info);
+    return Read(make_pair(DB_BLOCK_FILES, nFile), info);
 }
 
 bool CBlockTreeDB::WriteReindexing(bool fReindexing) {
@@ -228,51 +230,51 @@ void CCoinsViewDBCursor::Next()
     }
 }
 
-bool CBlockTreeDB::WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const std::vector<const CBlockIndex*>& blockinfo) {
+bool CBlockTreeDB::WriteBatchSync(const vector<pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const vector<const CBlockIndex*>& blockinfo) {
     CDBBatch batch(*this);
-    for (std::vector<std::pair<int, const CBlockFileInfo*> >::const_iterator it=fileInfo.begin(); it != fileInfo.end(); it++) {
-        batch.Write(std::make_pair(DB_BLOCK_FILES, it->first), *it->second);
+    for (vector<pair<int, const CBlockFileInfo*> >::const_iterator it=fileInfo.begin(); it != fileInfo.end(); it++) {
+        batch.Write(make_pair(DB_BLOCK_FILES, it->first), *it->second);
     }
     batch.Write(DB_LAST_BLOCK, nLastFile);
-    for (std::vector<const CBlockIndex*>::const_iterator it=blockinfo.begin(); it != blockinfo.end(); it++) {
-        batch.Write(std::make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()), CDiskBlockIndex(*it));
+    for (vector<const CBlockIndex*>::const_iterator it=blockinfo.begin(); it != blockinfo.end(); it++) {
+        batch.Write(make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()), CDiskBlockIndex(*it));
     }
     return WriteBatch(batch, true);
 }
 
 bool CBlockTreeDB::ReadTxIndex(const uint256 &txid, CDiskTxPos &pos) {
-    return Read(std::make_pair(DB_TXINDEX, txid), pos);
+    return Read(make_pair(DB_TXINDEX, txid), pos);
 }
 
-bool CBlockTreeDB::WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> >&vect) {
+bool CBlockTreeDB::WriteTxIndex(const vector<pair<uint256, CDiskTxPos> >&vect) {
     CDBBatch batch(*this);
-    for (std::vector<std::pair<uint256,CDiskTxPos> >::const_iterator it=vect.begin(); it!=vect.end(); it++)
-        batch.Write(std::make_pair(DB_TXINDEX, it->first), it->second);
+    for (vector<pair<uint256,CDiskTxPos> >::const_iterator it=vect.begin(); it!=vect.end(); it++)
+        batch.Write(make_pair(DB_TXINDEX, it->first), it->second);
     return WriteBatch(batch);
 }
 
-bool CBlockTreeDB::WriteFlag(const std::string &name, bool fValue) {
-    return Write(std::make_pair(DB_FLAG, name), fValue ? '1' : '0');
+bool CBlockTreeDB::WriteFlag(const string &name, bool fValue) {
+    return Write(make_pair(DB_FLAG, name), fValue ? '1' : '0');
 }
 
-bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
+bool CBlockTreeDB::ReadFlag(const string &name, bool &fValue) {
     char ch;
-    if (!Read(std::make_pair(DB_FLAG, name), ch))
+    if (!Read(make_pair(DB_FLAG, name), ch))
         return false;
     fValue = ch == '1';
     return true;
 }
 
-bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, std::function<CBlockIndex*(const uint256&, const uint256&)> insertBlockIndex)
+bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, function<CBlockIndex*(const uint256&, const uint256&)> insertBlockIndex)
 {
-    std::unique_ptr<CDBIterator> pcursor(NewIterator());
+    unique_ptr<CDBIterator> pcursor(NewIterator());
 
-    pcursor->Seek(std::make_pair(DB_BLOCK_INDEX, uint256()));
+    pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
 
     // Load mapBlockIndex
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
-        std::pair<char, uint256> key;
+        pair<char, uint256> key;
         if (pcursor->GetKey(key) && key.first == DB_BLOCK_INDEX) {
             CDiskBlockIndex diskindex;
             if (pcursor->GetValue(diskindex)) {
@@ -306,13 +308,13 @@ bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, 
 CSidechainTreeDB::CSidechainTreeDB(size_t nCacheSize, bool fMemory, bool fWipe)
     : CDBWrapper(GetDataDir() / "blocks" / "sidechain", nCacheSize, fMemory, fWipe) { }
 
-bool CSidechainTreeDB::WriteSidechainIndex(const std::vector<std::pair<uint256, const SidechainObj *> > &list)
+bool CSidechainTreeDB::WriteSidechainIndex(const vector<pair<uint256, const SidechainObj *> > &list)
 {
     CDBBatch batch(*this);
-    for (std::vector<std::pair<uint256, const SidechainObj *> >::const_iterator it=list.begin(); it!=list.end(); it++) {
+    for (vector<pair<uint256, const SidechainObj *> >::const_iterator it=list.begin(); it!=list.end(); it++) {
         const uint256 &objid = it->first;
         const SidechainObj *obj = it->second;
-        std::pair<char, uint256> key = std::make_pair(obj->sidechainop, objid);
+        pair<char, uint256> key = make_pair(obj->sidechainop, objid);
 
         if (obj->sidechainop == DB_SIDECHAIN_WITHDRAWAL_OP) {
             const SidechainWithdrawal *ptr = (const SidechainWithdrawal *) obj;
@@ -325,7 +327,7 @@ bool CSidechainTreeDB::WriteSidechainIndex(const std::vector<std::pair<uint256, 
 
             // Also index the WithdrawalBundle by the WithdrawalBundle transaction hash
             uint256 hashWithdrawalBundle = ptr->tx.GetHash();
-            std::pair<char, uint256> keyTx = std::make_pair(DB_SIDECHAIN_WITHDRAWAL_BUNDLE_OP, hashWithdrawalBundle);
+            pair<char, uint256> keyTx = make_pair(DB_SIDECHAIN_WITHDRAWAL_BUNDLE_OP, hashWithdrawalBundle);
             batch.Write(keyTx, *ptr);
 
             // Update DB_LAST_SIDECHAIN_WITHDRAWAL_BUNDLE
@@ -341,7 +343,7 @@ bool CSidechainTreeDB::WriteSidechainIndex(const std::vector<std::pair<uint256, 
 
             // Also index the deposit by the non amount hash
             uint256 hashNonAmount = ptr->GetID();
-            batch.Write(std::make_pair(DB_SIDECHAIN_DEPOSIT_OP, hashNonAmount), *ptr);
+            batch.Write(make_pair(DB_SIDECHAIN_DEPOSIT_OP, hashNonAmount), *ptr);
 
             // Update DB_LAST_SIDECHAIN_DEPOSIT
             batch.Write(DB_LAST_SIDECHAIN_DEPOSIT, hashNonAmount);
@@ -351,13 +353,13 @@ bool CSidechainTreeDB::WriteSidechainIndex(const std::vector<std::pair<uint256, 
     return WriteBatch(batch, true);
 }
 
-bool CSidechainTreeDB::WriteWithdrawalUpdate(const std::vector<SidechainWithdrawal>& vWithdrawal)
+bool CSidechainTreeDB::WriteWithdrawalUpdate(const vector<SidechainWithdrawal>& vWithdrawal)
 {
     CDBBatch batch(*this);
 
     for (const SidechainWithdrawal& wt : vWithdrawal)
     {
-        std::pair<char, uint256> key = std::make_pair(wt.sidechainop, wt.GetID());
+        pair<char, uint256> key = make_pair(wt.sidechainop, wt.GetID());
         batch.Write(key, wt);
     }
 
@@ -368,16 +370,16 @@ bool CSidechainTreeDB::WriteWithdrawalBundleUpdate(const SidechainWithdrawalBund
 {
     CDBBatch batch(*this);
 
-    std::pair<char, uint256> key = std::make_pair(withdrawalBundle.sidechainop, withdrawalBundle.GetID());
+    pair<char, uint256> key = make_pair(withdrawalBundle.sidechainop, withdrawalBundle.GetID());
     batch.Write(key, withdrawalBundle);
 
     // Also index the WithdrawalBundle by the WithdrawalBundle transaction hash
     uint256 hashWithdrawalBundle = withdrawalBundle.tx.GetHash();
-    std::pair<char, uint256> keyTx = std::make_pair(DB_SIDECHAIN_WITHDRAWAL_BUNDLE_OP, hashWithdrawalBundle);
+    pair<char, uint256> keyTx = make_pair(DB_SIDECHAIN_WITHDRAWAL_BUNDLE_OP, hashWithdrawalBundle);
     batch.Write(keyTx, withdrawalBundle);
 
     // Also write withdrawal status updates if WithdrawalBundle status changes
-    std::vector<SidechainWithdrawal> vUpdate;
+    vector<SidechainWithdrawal> vUpdate;
     for (const uint256& id: withdrawalBundle.vWithdrawalID) {
         SidechainWithdrawal withdrawal;
         if (!GetWithdrawal(id, withdrawal)) {
@@ -415,7 +417,7 @@ bool CSidechainTreeDB::WriteLastWithdrawalBundleHash(const uint256& hash)
 
 bool CSidechainTreeDB::GetWithdrawal(const uint256& objid, SidechainWithdrawal& withdrawal)
 {
-    if (ReadSidechain(std::make_pair(DB_SIDECHAIN_WITHDRAWAL_OP, objid), withdrawal))
+    if (ReadSidechain(make_pair(DB_SIDECHAIN_WITHDRAWAL_OP, objid), withdrawal))
         return true;
 
     return false;
@@ -423,7 +425,7 @@ bool CSidechainTreeDB::GetWithdrawal(const uint256& objid, SidechainWithdrawal& 
 
 bool CSidechainTreeDB::GetWithdrawalBundle(const uint256& objid, SidechainWithdrawalBundle& withdrawalBundle)
 {
-    if (ReadSidechain(std::make_pair(DB_SIDECHAIN_WITHDRAWAL_BUNDLE_OP, objid), withdrawalBundle))
+    if (ReadSidechain(make_pair(DB_SIDECHAIN_WITHDRAWAL_BUNDLE_OP, objid), withdrawalBundle))
         return true;
 
     return false;
@@ -431,26 +433,26 @@ bool CSidechainTreeDB::GetWithdrawalBundle(const uint256& objid, SidechainWithdr
 
 bool CSidechainTreeDB::GetDeposit(const uint256& objid, SidechainDeposit& deposit)
 {
-    if (ReadSidechain(std::make_pair(DB_SIDECHAIN_DEPOSIT_OP, objid), deposit))
+    if (ReadSidechain(make_pair(DB_SIDECHAIN_DEPOSIT_OP, objid), deposit))
         return true;
 
     return false;
 }
 
-std::vector<SidechainWithdrawal> CSidechainTreeDB::GetWithdrawals(const uint8_t& nSidechain)
+vector<SidechainWithdrawal> CSidechainTreeDB::GetWithdrawals(const uint8_t& nSidechain)
 {
     const char sidechainop = DB_SIDECHAIN_WITHDRAWAL_OP;
-    std::ostringstream ss;
-    ::Serialize(ss, std::make_pair(std::make_pair(sidechainop, nSidechain), uint256()));
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(sidechainop, nSidechain), uint256()));
 
-    std::vector<SidechainWithdrawal> vWT;
+    vector<SidechainWithdrawal> vWT;
 
-    std::unique_ptr<CDBIterator> pcursor(NewIterator());
+    unique_ptr<CDBIterator> pcursor(NewIterator());
     pcursor->Seek(ss.str());
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
 
-        std::pair<char, uint256> key;
+        pair<char, uint256> key;
         SidechainWithdrawal wt;
         if (pcursor->GetKey(key) && key.first == sidechainop) {
             if (pcursor->GetSidechainValue(wt))
@@ -463,20 +465,20 @@ std::vector<SidechainWithdrawal> CSidechainTreeDB::GetWithdrawals(const uint8_t&
     return vWT;
 }
 
-std::vector<SidechainWithdrawalBundle> CSidechainTreeDB::GetWithdrawalBundles(const uint8_t& nSidechain)
+vector<SidechainWithdrawalBundle> CSidechainTreeDB::GetWithdrawalBundles(const uint8_t& nSidechain)
 {
     const char sidechainop = DB_SIDECHAIN_WITHDRAWAL_BUNDLE_OP;
-    std::ostringstream ss;
-    ::Serialize(ss, std::make_pair(std::make_pair(sidechainop, nSidechain), uint256()));
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(sidechainop, nSidechain), uint256()));
 
-    std::vector<SidechainWithdrawalBundle> vWithdrawalBundle;
+    vector<SidechainWithdrawalBundle> vWithdrawalBundle;
 
-    std::unique_ptr<CDBIterator> pcursor(NewIterator());
+    unique_ptr<CDBIterator> pcursor(NewIterator());
     pcursor->Seek(ss.str());
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
 
-        std::pair<char, uint256> key;
+        pair<char, uint256> key;
         SidechainWithdrawalBundle withdrawalBundle;
         if (pcursor->GetKey(key) && key.first == sidechainop) {
             if (pcursor->GetSidechainValue(withdrawalBundle)) {
@@ -491,20 +493,20 @@ std::vector<SidechainWithdrawalBundle> CSidechainTreeDB::GetWithdrawalBundles(co
     return vWithdrawalBundle;
 }
 
-std::vector<SidechainDeposit> CSidechainTreeDB::GetDeposits(const uint8_t& nSidechain)
+vector<SidechainDeposit> CSidechainTreeDB::GetDeposits(const uint8_t& nSidechain)
 {
     const char sidechainop = DB_SIDECHAIN_DEPOSIT_OP;
-    std::ostringstream ss;
-    ::Serialize(ss, std::make_pair(std::make_pair(sidechainop, nSidechain), uint256()));
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(sidechainop, nSidechain), uint256()));
 
-    std::vector<SidechainDeposit> vDeposit;
+    vector<SidechainDeposit> vDeposit;
 
-    std::unique_ptr<CDBIterator> pcursor(NewIterator());
+    unique_ptr<CDBIterator> pcursor(NewIterator());
     pcursor->Seek(ss.str());
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
 
-        std::pair<char, uint256> key;
+        pair<char, uint256> key;
         SidechainDeposit deposit;
         if (pcursor->GetKey(key) && key.first == sidechainop) {
             if (pcursor->GetSidechainValue(deposit))
@@ -521,14 +523,14 @@ std::vector<SidechainDeposit> CSidechainTreeDB::GetDeposits(const uint8_t& nSide
 bool CSidechainTreeDB::HaveDeposits()
 {
     const char sidechainop = DB_SIDECHAIN_DEPOSIT_OP;
-    std::ostringstream ss;
-    ::Serialize(ss, std::make_pair(std::make_pair(sidechainop, DB_SIDECHAIN_DEPOSIT_OP), uint256()));
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(sidechainop, DB_SIDECHAIN_DEPOSIT_OP), uint256()));
 
-    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
     pcursor->Seek(ss.str());
     if (pcursor->Valid()) {
         boost::this_thread::interruption_point();
-        std::pair<char, uint256> key;
+        pair<char, uint256> key;
         SidechainDeposit d;
         if (pcursor->GetKey(key) && key.first == sidechainop) {
             if (pcursor->GetSidechainValue(d))
@@ -541,7 +543,7 @@ bool CSidechainTreeDB::HaveDeposits()
 bool CSidechainTreeDB::HaveDepositNonAmount(const uint256& hashNonAmount)
 {
     SidechainDeposit deposit;
-    if (ReadSidechain(std::make_pair(DB_SIDECHAIN_DEPOSIT_OP, hashNonAmount),
+    if (ReadSidechain(make_pair(DB_SIDECHAIN_DEPOSIT_OP, hashNonAmount),
                 deposit))
         return true;
 
@@ -556,7 +558,7 @@ bool CSidechainTreeDB::GetLastDeposit(SidechainDeposit& deposit)
         return false;
 
     // Read the last deposit
-    if (ReadSidechain(std::make_pair(DB_SIDECHAIN_DEPOSIT_OP, objid), deposit))
+    if (ReadSidechain(make_pair(DB_SIDECHAIN_DEPOSIT_OP, objid), deposit))
         return true;
 
     return false;
@@ -574,7 +576,7 @@ bool CSidechainTreeDB::GetLastWithdrawalBundleHash(uint256& hash)
 bool CSidechainTreeDB::HaveWithdrawalBundle(const uint256& hashWithdrawalBundle) const
 {
     SidechainWithdrawalBundle withdrawalBundle;
-    if (ReadSidechain(std::make_pair(DB_SIDECHAIN_WITHDRAWAL_BUNDLE_OP, hashWithdrawalBundle), withdrawalBundle))
+    if (ReadSidechain(make_pair(DB_SIDECHAIN_WITHDRAWAL_BUNDLE_OP, hashWithdrawalBundle), withdrawalBundle))
         return true;
 
     return false;
@@ -590,7 +592,7 @@ public:
     bool fCoinBase;
 
     //! unspent transaction outputs; spent outputs are .IsNull(); spent outputs at the end of the array are dropped
-    std::vector<CTxOut> vout;
+    vector<CTxOut> vout;
 
     //! at which height this transaction was included in the active block chain
     int nHeight;
@@ -607,7 +609,7 @@ public:
         // header code
         ::Unserialize(s, VARINT(nCode));
         fCoinBase = nCode & 1;
-        std::vector<bool> vAvail(2, false);
+        vector<bool> vAvail(2, false);
         vAvail[0] = (nCode & 2) != 0;
         vAvail[1] = (nCode & 4) != 0;
         unsigned int nMaskCode = (nCode / 8) + ((nCode & 6) != 0 ? 0 : 1);
@@ -640,8 +642,8 @@ public:
  * Currently implemented: from the per-tx utxo model (0.8..0.14.x) to per-txout.
  */
 bool CCoinsViewDB::Upgrade() {
-    std::unique_ptr<CDBIterator> pcursor(db.NewIterator());
-    pcursor->Seek(std::make_pair(DB_COINS, uint256()));
+    unique_ptr<CDBIterator> pcursor(db.NewIterator());
+    pcursor->Seek(make_pair(DB_COINS, uint256()));
     if (!pcursor->Valid()) {
         return true;
     }
@@ -653,8 +655,8 @@ bool CCoinsViewDB::Upgrade() {
     size_t batch_size = 1 << 24;
     CDBBatch batch(db);
     int reportDone = 0;
-    std::pair<unsigned char, uint256> key;
-    std::pair<unsigned char, uint256> prev_key = {DB_COINS, uint256()};
+    pair<unsigned char, uint256> key;
+    pair<unsigned char, uint256> prev_key = {DB_COINS, uint256()};
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
         if (ShutdownRequested()) {
@@ -678,7 +680,7 @@ bool CCoinsViewDB::Upgrade() {
             COutPoint outpoint(key.second, 0);
             for (size_t i = 0; i < old_coins.vout.size(); ++i) {
                 if (!old_coins.vout[i].IsNull() && !old_coins.vout[i].scriptPubKey.IsUnspendable()) {
-                    Coin newcoin(std::move(old_coins.vout[i]), old_coins.nHeight, old_coins.fCoinBase);
+                    Coin newcoin(move(old_coins.vout[i]), old_coins.nHeight, old_coins.fCoinBase);
                     outpoint.n = i;
                     CoinEntry entry(&outpoint);
                     batch.Write(entry, newcoin);
@@ -701,4 +703,410 @@ bool CCoinsViewDB::Upgrade() {
     uiInterface.ShowProgress("", 100, false);
     LogPrintf("[%s].\n", ShutdownRequested() ? "CANCELLED" : "DONE");
     return !ShutdownRequested();
+}
+
+/* Hivemind market database */
+
+CMarketTreeDB::CMarketTreeDB(size_t nCacheSize, bool fMemory, bool fWipe)
+  : CDBWrapper(GetDataDir() / "blocks" / "market", nCacheSize, fMemory, fWipe) {
+}
+
+bool CMarketTreeDB::ReadBlockFileInfo(int nFile, CBlockFileInfo &info) {
+    return Read(make_pair('f', nFile), info);
+}
+
+bool CMarketTreeDB::WriteReindexing(bool fReindexing) {
+    if (fReindexing)
+        return Write('R', '1');
+    else
+        return Erase('R');
+}
+
+bool CMarketTreeDB::ReadReindexing(bool &fReindexing) {
+    fReindexing = Exists('R');
+    return true;
+}
+
+bool CMarketTreeDB::ReadLastBlockFile(int &nFile) {
+    return Read('l', nFile);
+}
+
+bool CMarketTreeDB::WriteBatchSync(const vector<pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const vector<const CBlockIndex*>& blockinfo) {
+    CDBBatch batch(*this);
+    for (vector<pair<int, const CBlockFileInfo*> >::const_iterator it=fileInfo.begin(); it != fileInfo.end(); it++) {
+        batch.Write(make_pair('f', it->first), *it->second);
+    }
+    batch.Write('l', nLastFile);
+    return WriteBatch(batch, true);
+}
+
+bool CMarketTreeDB::WriteMarketIndex(const vector<pair<uint256, const marketObj *> >&vect)
+{
+    CDBBatch batch(*this);
+
+    vector<pair<uint256,const marketObj *> >::const_iterator it;
+    for (it=vect.begin(); it != vect.end(); it++) {
+        const uint256 &objid = it->first;
+        const marketObj *obj = it->second;
+        pair<char,uint256> key = make_pair(obj->marketop, objid);
+
+        if (obj->marketop == 'B') {
+           const marketBranch *ptr = (const marketBranch *) obj;
+           pair<marketBranch,uint256> value = make_pair(*ptr, obj->txid);
+           batch.Write(key, value);
+        }
+        else
+        if (obj->marketop == 'D') {
+           const marketDecision *ptr = (const marketDecision *) obj;
+           pair<marketDecision,uint256> value = make_pair(*ptr, obj->txid);
+           batch.Write(key, value);
+           batch.Write(make_pair(make_pair('d',ptr->branchid),objid), value);
+        }
+        else
+        if (obj->marketop == 'L') {
+           const marketStealVote *ptr = (const marketStealVote *) obj;
+           pair<marketStealVote,uint256> value = make_pair(*ptr, obj->txid);
+           batch.Write(key, value);
+           batch.Write(make_pair(make_pair(make_pair('l',ptr->branchid),ptr->height),objid), value);
+        }
+        else
+        if (obj->marketop == 'M') {
+           const marketMarket *ptr = (const marketMarket *) obj;
+           pair<marketMarket,uint256> value = make_pair(*ptr, obj->txid);
+           batch.Write(key, value);
+           for(size_t i=0; i < ptr->decisionIDs.size(); i++)
+               batch.Write(make_pair(make_pair('m',ptr->decisionIDs[i]),objid), value);
+        }
+        else
+        if (obj->marketop == 'O') {
+           const marketOutcome *ptr = (const marketOutcome *) obj;
+           pair<marketOutcome,uint256> value = make_pair(*ptr, obj->txid);
+           batch.Write(key, value);
+           batch.Write(make_pair(make_pair('o',ptr->branchid),objid), value);
+        }
+        else
+        if (obj->marketop == 'R') {
+           const marketRevealVote *ptr = (const marketRevealVote *) obj;
+           pair<marketRevealVote,uint256> value = make_pair(*ptr, obj->txid);
+           batch.Write(key, value);
+           batch.Write(make_pair(make_pair(make_pair('r',ptr->branchid),ptr->height),objid), value);
+        }
+        else
+        if (obj->marketop == 'S') {
+           const marketSealedVote *ptr = (const marketSealedVote *) obj;
+           pair<marketSealedVote,uint256> value = make_pair(*ptr, obj->txid);
+           batch.Write(key, value);
+           batch.Write(make_pair(make_pair(make_pair('s',ptr->branchid),ptr->height),objid), value);
+        }
+        else
+        if (obj->marketop == 'T') {
+           const marketTrade *ptr = (const marketTrade *) obj;
+           pair<marketTrade,uint256> value = make_pair(*ptr, obj->txid);
+           batch.Write(key, value);
+           batch.Write(make_pair(make_pair('t',ptr->marketid),objid), value);
+        }
+    }
+    return WriteBatch(batch);
+}
+
+bool CMarketTreeDB::WriteFlag(const string &name, bool fValue) {
+    return Write(make_pair('F', name), fValue ? '1' : '0');
+}
+
+bool CMarketTreeDB::ReadFlag(const string &name, bool &fValue) {
+    char ch;
+    if (!Read(make_pair('F', name), ch))
+       return false;
+    fValue = ch == '1';
+    return true;
+}
+
+bool CMarketTreeDB::GetBranch(const uint256 &objid, marketBranch& branch)
+{
+    if (ReadSidechain(make_pair('B', objid), branch))
+        return true;
+
+    return false;
+}
+
+bool CMarketTreeDB::GetDecision(const uint256 &objid, marketDecision& decision)
+{
+    if (ReadSidechain(make_pair('D', objid), decision))
+        return true;
+
+    return false;
+}
+
+bool CMarketTreeDB::GetMarket(const uint256 &objid, marketMarket& market)
+{
+    if (ReadSidechain(make_pair('M', objid), market))
+        return true;
+
+    return false;
+}
+
+bool CMarketTreeDB::GetOutcome(const uint256 &objid, marketOutcome& outcome)
+{
+    if (ReadSidechain(make_pair('O', objid), outcome))
+        return true;
+
+    return false;
+}
+
+bool CMarketTreeDB::GetRevealVote(const uint256 &objid, marketRevealVote& vote)
+{
+    if (ReadSidechain(make_pair('R', objid), vote))
+        return true;
+
+    return false;
+}
+
+bool CMarketTreeDB::GetSealedVote(const uint256 &objid, marketSealedVote& vote)
+{
+    if (ReadSidechain(make_pair('S', objid), vote))
+        return true;
+
+    return false;
+}
+
+bool CMarketTreeDB::GetStealVote(const uint256 &objid, marketStealVote& vote)
+{
+    if (ReadSidechain(make_pair('L', objid), vote))
+        return true;
+
+    return false;
+}
+
+bool CMarketTreeDB::GetTrade(const uint256 &objid, marketTrade& trade)
+{
+    if (ReadSidechain(make_pair('T', objid), trade))
+        return true;
+
+    return false;
+}
+
+vector<marketBranch>
+CMarketTreeDB::GetBranches(void)
+{
+    const char op = 'B';
+    ostringstream ss;
+    ::Serialize(ss, make_pair(op, uint256()));
+
+    vector<marketBranch> vBranch;
+
+    unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(ss.str());
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+
+        pair<char, uint256> key;
+        marketBranch branch;
+        if (pcursor->GetKey(key) && key.first == op) {
+            if (pcursor->GetSidechainValue(branch))
+                vBranch.push_back(branch);
+        }
+
+        pcursor->Next();
+    }
+    return vBranch;
+}
+
+vector<marketDecision>
+CMarketTreeDB::GetDecisions(const uint256& id /* branch id */)
+{
+    const char op = 'd';
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(op, id), uint256()));
+
+    vector<marketDecision> vDecision;
+
+    unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(ss.str());
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+
+        pair<char, uint256> key;
+        marketDecision decision;
+        if (pcursor->GetKey(key) && key.first == op && key.second == id) {
+            if (pcursor->GetSidechainValue(decision))
+                vDecision.push_back(decision);
+        }
+
+        pcursor->Next();
+    }
+    return vDecision;
+}
+
+vector<marketMarket>
+CMarketTreeDB::GetMarkets(const uint256& id /* branch id */)
+{
+    const char op = 'm';
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(op, id), uint256()));
+
+    vector<marketMarket> vMarket;
+
+    unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(ss.str());
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+
+        pair<char, uint256> key;
+        marketMarket market;
+        if (pcursor->GetKey(key) && key.first == op && key.second == id) {
+            if (pcursor->GetSidechainValue(market))
+                vMarket.push_back(market);
+        }
+
+        pcursor->Next();
+    }
+    return vMarket;
+}
+
+vector<marketOutcome>
+CMarketTreeDB::GetOutcomes(const uint256& id /* branchid */)
+{
+    const char op = 'o';
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(op, id), uint256()));
+
+    vector<marketOutcome> vOutcome;
+
+    unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(ss.str());
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+
+        pair<char, uint256> key;
+        marketOutcome outcome;
+        if (pcursor->GetKey(key) && key.first == op && key.second == id) {
+            if (pcursor->GetSidechainValue(outcome))
+                vOutcome.push_back(outcome);
+        }
+
+        pcursor->Next();
+    }
+    return vOutcome;
+}
+
+vector<marketRevealVote>
+CMarketTreeDB::GetRevealVotes(const uint256 & /* branchid */ id, uint32_t height)
+{
+    const char op = 'r';
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(op, id), uint256()));
+
+    vector<marketRevealVote> vVote;
+
+    unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(ss.str());
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+
+        pair<pair<char, uint256>, uint32_t> key;
+        marketRevealVote vote;
+        if (pcursor->GetKey(key)) {
+            if (key.first.first != op)
+                continue;
+            if (key.first.second != id)
+                continue;
+            if (key.second != height)
+                continue;
+
+            vVote.push_back(vote);
+        }
+
+        pcursor->Next();
+    }
+    return vVote;
+}
+
+vector<marketSealedVote>
+CMarketTreeDB::GetSealedVotes(const uint256 & /* branchid */ id, uint32_t height)
+{
+    const char op = 's';
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(op, id), uint256()));
+
+    vector<marketSealedVote> vVote;
+
+    unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(ss.str());
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+
+        pair<pair<char, uint256>, uint32_t> key;
+        marketSealedVote vote;
+        if (pcursor->GetKey(key)) {
+            if (key.first.first != op)
+                continue;
+            if (key.first.second != id)
+                continue;
+            if (key.second != height)
+                continue;
+
+            vVote.push_back(vote);
+        }
+
+        pcursor->Next();
+    }
+    return vVote;
+}
+
+vector<marketStealVote>
+CMarketTreeDB::GetStealVotes(const uint256 & /* branchid */ id, uint32_t height)
+{
+    const char op = 'l';
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(op, id), uint256()));
+
+    vector<marketStealVote> vVote;
+
+    unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(ss.str());
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+
+        pair<pair<char, uint256>, uint32_t> key;
+        marketStealVote vote;
+        if (pcursor->GetKey(key)) {
+            if (key.first.first != op)
+                continue;
+            if (key.first.second != id)
+                continue;
+            if (key.second != height)
+                continue;
+
+            vVote.push_back(vote);
+        }
+
+        pcursor->Next();
+    }
+    return vVote;
+}
+
+vector<marketTrade>
+CMarketTreeDB::GetTrades(const uint256 & /* marketid */ id)
+{
+    const char op = 't';
+    ostringstream ss;
+    ::Serialize(ss, make_pair(make_pair(op, id), uint256()));
+
+    vector<marketTrade> vTrade;
+
+    unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(ss.str());
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+
+        pair<char, uint256> key;
+        marketTrade trade;
+        if (pcursor->GetKey(key) && key.first == op && key.second == id) {
+            if (pcursor->GetSidechainValue(trade))
+                vTrade.push_back(trade);
+        }
+
+        pcursor->Next();
+    }
+    return vTrade;
 }
