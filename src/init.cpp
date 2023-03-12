@@ -1477,15 +1477,6 @@ bool AppInitMain()
                     break;
                 }
 
-                // At this point blocktree args are consistent with what's on disk.
-                // If we're not mid-reindex (based on disk + args), add a genesis block on disk
-                // (otherwise we use the one already on disk).
-                // This is called again in ThreadImport after the reindex completes.
-                if (!fReindex && !LoadGenesisBlock(chainparams)) {
-                    strLoadError = _("Error initializing block database - failed to load genesis block");
-                    break;
-                }
-
                 // At this point we're either in reindex or we've loaded a useful
                 // block tree into mapBlockIndex!
 
@@ -1516,6 +1507,15 @@ bool AppInitMain()
                         break;
                     }
                     assert(chainActive.Tip() != nullptr);
+                }
+
+                // At this point blocktree args are consistent with what's on disk.
+                // If we're not mid-reindex (based on disk + args), add a genesis block on disk
+                // (otherwise we use the one already on disk).
+                // This is called again in ThreadImport after the reindex completes.
+                if (!fReindex && !LoadGenesisBlock(chainparams)) {
+                    strLoadError = _("Error initializing block database - failed to load genesis block");
+                    break;
                 }
 
                 if (!fReset) {

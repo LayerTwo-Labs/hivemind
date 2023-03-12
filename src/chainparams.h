@@ -9,6 +9,7 @@
 #include <chainparamsbase.h>
 #include <consensus/params.h>
 #include <primitives/block.h>
+#include <primitives/market.h>
 #include <protocol.h>
 
 #include <memory>
@@ -58,6 +59,7 @@ public:
     int GetDefaultPort() const { return nDefaultPort; }
 
     const CBlock& GenesisBlock() const { return genesis; }
+    const marketBranch &GenesisBranch() const { return genesisBranch; }
     /** Default value for -checkmempool and -checkblockindex argument */
     bool DefaultConsistencyChecks() const { return fDefaultConsistencyChecks; }
     /** Policy: Filter transactions that do not match well-defined patterns */
@@ -87,6 +89,7 @@ protected:
     std::string bech32_hrp;
     std::string strNetworkID;
     CBlock genesis;
+    marketBranch genesisBranch;
     std::vector<SeedSpec6> vFixedSeeds;
     bool fDefaultConsistencyChecks;
     bool fRequireStandard;

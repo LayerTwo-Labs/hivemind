@@ -14,15 +14,41 @@
 #include <utilstrencodings.h>
 
 
-static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint32_t nTime, int32_t nVersion, const CAmount& genesisReward)
+static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint32_t nTime, int32_t nVersion, const CAmount& genesisReward, marketBranch& genesisBranch)
 {
     CMutableTransaction txNew;
     txNew.nVersion = 1;
     txNew.vin.resize(1);
-    txNew.vout.resize(1);
-    txNew.vin[0].scriptSig = CScript() << 486604799 << CScriptNum(4) << std::vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
-    txNew.vout[0].nValue = genesisReward;
-    txNew.vout[0].scriptPubKey = genesisOutputScript;
+    txNew.vout.resize(2);
+
+    /* vin[0]: */
+    txNew.vin[0].scriptSig = CScript() << ParseHex("ffff001d") << ParseHex("84");
+
+    /* vout[0]: first branch */
+    genesisBranch.marketop = 'B';
+    genesisBranch.nHeight = 0;
+    genesisBranch.name = "Main";
+    genesisBranch.description = "Main Branch";
+    genesisBranch.baseListingFee = COIN / 100;
+    genesisBranch.freeDecisions = 10;
+    genesisBranch.targetDecisions = 20;
+    genesisBranch.maxDecisions = 30;
+    genesisBranch.minTradingFee = COIN / 100;
+    genesisBranch.alpha = COIN / 10;
+    genesisBranch.tol = COIN / 5;
+    genesisBranch.tau = 7*40;
+    genesisBranch.ballotTime = 2*40;
+    genesisBranch.unsealTime = 2*40;
+    genesisBranch.consensusThreshold = COIN / 100;
+
+    txNew.vout[0].nValue = 0;
+    txNew.vout[0].scriptPubKey = genesisBranch.GetScript();
+
+    /* Genesis branch votecoins */
+    txNew.vout[1].nValue = 2500000000; // Vs3wG59emG9RawcDmPp4h8E6RQSUcU8JVs
+    txNew.vout[1].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << ParseHex("bb10b0147b4a27610135ec84d78a1c9492f6452b") << OP_EQUALVERIFY << OP_CHECKSIG;
+
+    genesisBranch.txid = txNew.GetHash();
 
     CBlock genesis;
     genesis.nTime    = nTime;
@@ -31,6 +57,7 @@ static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesi
     genesis.vtx.push_back(MakeTransactionRef(std::move(txNew)));
     genesis.hashPrevBlock.SetNull();
     genesis.hashMerkleRoot = BlockMerkleRoot(genesis);
+
     return genesis;
 }
 
@@ -40,13 +67,13 @@ static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesi
  * database.
  *
  */
-static CBlock CreateGenesisBlock(uint32_t nTime, int32_t nVersion, const CAmount& genesisReward)
+static CBlock CreateGenesisBlock(uint32_t nTime, int32_t nVersion, const CAmount& genesisReward, marketBranch& genesisBranch)
 {
     // Note: For sidechains the timestamp should be:
     // "mainchainBlockHeight:mainchainBlockHash"
     const char* pszTimestamp = "nnnnnn:0xnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn";
     const CScript genesisOutputScript = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
-    return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nVersion, genesisReward);
+    return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nVersion, genesisReward, genesisBranch);
 }
 
 void CChainParams::UpdateVersionBitsParameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout)
@@ -113,11 +140,11 @@ public:
         nDefaultPort = 2751;
         nPruneAfterHeight = 100000;
 
-        genesis = CreateGenesisBlock(1668664716, 1, 0);
+        genesis = CreateGenesisBlock(1673316936, 1, 0, genesisBranch);
         consensus.hashGenesisBlock = genesis.GetHash();
 
-        assert(consensus.hashGenesisBlock == uint256S("0x16b727d88ca690666aad007974659206e83c3ee250ce6e708beed03c39014665"));
-        assert(genesis.hashMerkleRoot == uint256S("0x8eb1364f43885edf1322b2d32095e57abb03c32a61a80ac25c8db3de58e16b8a"));
+        assert(consensus.hashGenesisBlock == uint256S("0xca49b25b306724559b2a024461adb8216ef0043239ed223cd3bb58cc82959f23"));
+        assert(genesis.hashMerkleRoot == uint256S("0xf52a2c57f7633044dc1c8e8d3a02c732992417acd045abd9bddbda3ab8187445"));
 
         vSeeds.clear();
 
@@ -140,7 +167,7 @@ public:
 
         checkpointData = {
             {
-                { 0, uint256S("0x16b727d88ca690666aad007974659206e83c3ee250ce6e708beed03c39014665")},
+                { 0, uint256S("0xca49b25b306724559b2a024461adb8216ef0043239ed223cd3bb58cc82959f23")},
             }
         };
 
@@ -195,11 +222,11 @@ public:
         nDefaultPort = 12444;
         nPruneAfterHeight = 1000;
 
-        genesis = CreateGenesisBlock(1624147757, 1, 0);
+        genesis = CreateGenesisBlock(1624147757, 1, 0, genesisBranch);
         consensus.hashGenesisBlock = genesis.GetHash();
 
-        assert(consensus.hashGenesisBlock == uint256S("0x14d9aa5f9fbaa70eb702a64e5e9d1684ad38bf31737c17bd19b5b49705444774"));
-        assert(genesis.hashMerkleRoot == uint256S("0x8eb1364f43885edf1322b2d32095e57abb03c32a61a80ac25c8db3de58e16b8a"));
+        assert(consensus.hashGenesisBlock == uint256S("0x29076a54f004c95653cf068b9fcdec906f0c1ef021dfcc97a8962bc77bb49780"));
+        assert(genesis.hashMerkleRoot == uint256S("0xf52a2c57f7633044dc1c8e8d3a02c732992417acd045abd9bddbda3ab8187445"));
 
         vFixedSeeds.clear(); //!< Regtest mode doesn't have any fixed seeds.
         vSeeds.clear();      //!< Regtest mode doesn't have any DNS seeds.

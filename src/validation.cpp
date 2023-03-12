@@ -5045,6 +5045,34 @@ bool CChainState::LoadGenesisBlock(const CChainParams& chainparams)
         CValidationState state;
         if (!ReceivedBlockTransactions(block, state, pindex, blockPos, chainparams.GetConsensus()))
             return error("%s: genesis block not accepted", __func__);
+
+        // Hivemind market genesis branch & coins
+
+        // Write Genesis Branch to DB
+        const marketBranch *obj = &Params().GenesisBranch();
+        std::vector<std::pair<uint256, const marketObj *> > vMarketObj;
+        vMarketObj.push_back(std::make_pair(obj->GetHash(), obj));
+        if (!pmarkettree->WriteMarketIndex(vMarketObj))
+            return error("LoadBlockIndex() : genesis branch cannot be written.");
+
+        // Write Genesis TXID to DB
+        std::vector<std::pair<uint256, CDiskTxPos> > vPos;
+        CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
+        vPos.push_back(std::make_pair(block.vtx[0]->GetHash(), pos));
+        if (!pblocktree->WriteTxIndex(vPos))
+            return error("LoadBlockIndex() : genesis transaction cannot be written.");
+
+        // Write Genesis Coins
+        CCoinsViewCache view(pcoinsTip.get());
+
+        for(uint32_t i = 0; i < block.vtx.size(); i++)
+            UpdateCoins(*block.vtx[i], view, 0);
+
+        bool flushed = view.Flush();
+        assert(flushed);
+
+        if (!FlushStateToDisk(chainparams, state, FLUSH_STATE_IF_NEEDED))
+            return error("%s: Failed to flush state to disk!\n", __func__);
     } catch (const std::runtime_error& e) {
         return error("%s: failed to write genesis block: %s", __func__, e.what());
     }
