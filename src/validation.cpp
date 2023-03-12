@@ -216,6 +216,7 @@ int nScriptCheckThreads = 0;
 std::atomic_bool fImporting(false);
 std::atomic_bool fReindex(false);
 bool fTxIndex = false;
+bool fMarketIndex = true;
 bool fHavePruned = false;
 bool fPruneMode = false;
 bool fIsBareMultisigStd = DEFAULT_PERMIT_BAREMULTISIG;
@@ -244,6 +245,24 @@ const std::string strRefundMessageMagic = "REFUND DhjM9iNapSA 3e243e21\n";
 
 std::mutex mainBlockCacheMutex;
 std::mutex mainBlockCacheReorgMutex;
+
+void InsertMarketObjectHeight(marketObj *obj)
+{
+    if (!obj) return;
+
+    // Insert default nHeight
+    obj->nHeight = (uint32_t) (-1);
+
+    // Insert actual nHeight, if in chain
+    CTransactionRef tx;
+    uint256 hashBlock;
+    if (GetTransaction(obj->txid, tx, Params().GetConsensus(), hashBlock, true)) {
+        CBlockIndex *pindex = (*mapBlockIndex.find(hashBlock)).second;
+        if (pindex && chainActive.Contains(pindex)) {
+            obj->nHeight = pindex->nHeight;
+        }
+    }
+}
 
 // Internal stuff
 namespace {
@@ -2524,6 +2543,35 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
             for (size_t i = 0; i < vSidechainObjects.size(); i++)
                 delete vSidechainObjects[i].second;
         }
+
+        if (fMarketIndex)
+        {
+            /* vMarketObj is a vector of all market objects in the block */
+            std::vector<std::pair<uint256, const marketObj *> > vMarketObj;
+            for (const CTransactionRef& tx : block.vtx) {
+                for (const CTxOut& txout : tx->vout) {
+                    const CScript& scriptPubKey = txout.scriptPubKey;
+                    size_t script_sz = scriptPubKey.size();
+                    if ((script_sz < 2) ||
+                    (scriptPubKey[script_sz-1] != OP_MARKET))
+                        continue;
+                    marketObj *obj = marketObjCtr(scriptPubKey);
+                    if (!obj)
+                        continue;
+                    obj->txid = tx->GetHash();
+                    vMarketObj.push_back(std::make_pair(obj->GetHash(), obj));
+                }
+            }
+            /* write vMarketObj to tx db */
+            if (vMarketObj.size()) {
+                bool ret = pmarkettree->WriteMarketIndex(vMarketObj);
+                if (!ret)
+                    return AbortNode(state, "Failed to write market index");
+                for (size_t i=0; i < vMarketObj.size(); i++) {
+                    delete vMarketObj[i].second;
+                }
+            }
+        }
     }
 
     assert(pindex->phashBlock);
@@ -2620,6 +2668,9 @@ bool static FlushStateToDisk(const CChainParams& chainparams, CValidationState &
                 }
                 if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks)) {
                     return AbortNode(state, "Failed to write to block index database");
+                }
+                if (!pmarkettree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks)) {
+                    return AbortNode(state, "Files to write to block market database");
                 }
             }
             // Finally remove any pruned files
@@ -4627,6 +4678,10 @@ bool static LoadBlockIndexDB(const CChainParams& chainparams)
     pblocktree->ReadReindexing(fReindexing);
     if(fReindexing) fReindex = true;
 
+    // Check whether we have a market index
+    pmarkettree->ReadFlag("market", fMarketIndex);
+    LogPrintf("LoadBlockIndexDB(): market index %s\n", fMarketIndex ? "enabled" : "disabled");
+
     // Check whether we have a transaction index
     pblocktree->ReadFlag("txindex", fTxIndex);
     LogPrintf("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
@@ -5021,7 +5076,9 @@ bool LoadBlockIndex(const CChainParams& chainparams)
         fTxIndex = gArgs.GetBoolArg("-txindex", DEFAULT_TXINDEX);
         pblocktree->WriteFlag("txindex", fTxIndex);
         pblocktree->WriteFlag("sidechain", fSidechainIndex);
+        pmarkettree->WriteFlag("market", fMarketIndex);
     }
+
     return true;
 }
 
