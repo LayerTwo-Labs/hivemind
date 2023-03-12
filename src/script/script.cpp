@@ -9,6 +9,8 @@
 #include <utilstrencodings.h>
 #include <uint256.h>
 
+#include <primitives/market.h>
+
 const char* GetOpName(opcodetype opcode)
 {
     switch (opcode)
@@ -246,54 +248,55 @@ bool CScript::IsMarketScript(std::vector<unsigned char>& hashBytes) const
     if (this->back() != OP_MARKET)
        return false;
 
-    // TODO
-    // Move Market deserialization to market.cpp or validation.cpp
-    //marketObj *obj = marketObjCtr(*this);
-    //if (!obj)
-    //   return ret;
+    // Some market objects have a KeyID
+    // We deserialize here so that we can return the KeyID to tx solver
 
-    //if (obj->marketop == 'B') { /* branch */
-    //   ret = true;
-    //}
-    //else
-    //if (obj->marketop == 'D') {
-    //   marketDecision *ptr = (marketDecision *) obj;
-    //   hashBytes = vector<unsigned char> (ptr->keyID.begin(), ptr->keyID.end());
-    //   delete ptr;
-    //   ret = true;
-    //}
-    //else
-    //if (obj->marketop == 'L') { /* steal vote */
-    //   ret = true;
-    //}
-    //else
-    //if (obj->marketop == 'M') { /* market */
-    //   marketMarket *ptr = (marketMarket *) obj;
-    //   hashBytes = vector<unsigned char> (ptr->keyID.begin(), ptr->keyID.end());
-    //   delete ptr;
-    //   ret = true;
-    // }
-    //else
-    //if (obj->marketop == 'O') { /* outcome */
-    //   ret = true;
-    // }
-    // else
-    // if (obj->marketop == 'R') { /* reveal vote */
-    //   ret = true;
-    // }
-    // else
-    // if (obj->marketop == 'S') { /* sealed vote */
-    //   ret = true;
-    // }
-    // else
-    // if (obj->marketop == 'T') { /* trade */
-    //   marketTrade *ptr = (marketTrade *) obj;
-    //   hashBytes = vector<unsigned char> (ptr->keyID.begin(), ptr->keyID.end());
-    //   delete ptr;
-    //   ret = true;
-    //}
+    marketObj *obj = marketObjCtr(*this);
+    if (!obj)
+       return false;
 
-    return true;
+    if (obj->marketop == 'B') { /* branch */
+       return true;
+    }
+    else
+    if (obj->marketop == 'D') { /* decision */
+       marketDecision *ptr = (marketDecision *) obj;
+       hashBytes = vector<unsigned char> (ptr->keyID.begin(), ptr->keyID.end());
+       delete ptr;
+       return true;
+    }
+    else
+    if (obj->marketop == 'L') { /* steal vote */
+       return true;
+    }
+    else
+    if (obj->marketop == 'M') { /* market */
+       marketMarket *ptr = (marketMarket *) obj;
+       hashBytes = vector<unsigned char> (ptr->keyID.begin(), ptr->keyID.end());
+       delete ptr;
+       return true;
+    }
+    else
+    if (obj->marketop == 'O') { /* outcome */
+        return true;
+    }
+    else
+    if (obj->marketop == 'R') { /* reveal vote */
+        return true;
+    }
+    else
+    if (obj->marketop == 'S') { /* sealed vote */
+        return true;
+    }
+    else
+    if (obj->marketop == 'T') { /* trade */
+        marketTrade *ptr = (marketTrade *) obj;
+        hashBytes = vector<unsigned char> (ptr->keyID.begin(), ptr->keyID.end());
+        delete ptr;
+        return true;
+    }
+
+    return false;
 }
 
 bool CScript::IsMarketScript(void) const
