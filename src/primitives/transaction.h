@@ -325,8 +325,10 @@ public:
     // Compute a hash that includes both transaction and witness data
     uint256 GetWitnessHash() const;
 
-    // Return sum of txouts.
+    // Return sum of non-market txouts.
     CAmount GetValueOut() const;
+    // Return sum of market txouts.
+    CAmount GetValueOutToMarket() const;
     // GetValueIn() is a method on CCoinsViewCache, because
     // inputs must be known to compute value in.
 
