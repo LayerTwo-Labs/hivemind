@@ -280,9 +280,7 @@ RES_ICONS = \
   qt/res/icons/address-book.png \
   qt/res/icons/about.png \
   qt/res/icons/about_qt.png \
-  qt/res/icons/bitcoin.ico \
-  qt/res/icons/bitcoin_testnet.ico \
-  qt/res/icons/bitcoin.png \
+  qt/res/icons/ballot.png \
   qt/res/icons/calculator.png \
   qt/res/icons/chevron.png \
   qt/res/icons/clock1.png \
@@ -297,6 +295,7 @@ RES_ICONS = \
   qt/res/icons/connect2.png \
   qt/res/icons/connect3.png \
   qt/res/icons/connect4.png \
+  qt/res/icons/decision.png \
   qt/res/icons/debugwindow.png \
   qt/res/icons/drivechain.png \
   qt/res/icons/edit.png \
@@ -313,17 +312,22 @@ RES_ICONS = \
   qt/res/icons/hd_disabled.png \
   qt/res/icons/hd_enabled.png \
   qt/res/icons/history.png \
+  qt/res/icons/hivemind.png \
+  qt/res/icons/hivemind.icns \
+  qt/res/icons/hivemind.ico \
   qt/res/icons/info.png \
   qt/res/icons/key.png \
   qt/res/icons/left.png \
   qt/res/icons/lock_closed.png \
   qt/res/icons/lock_open.png \
+  qt/res/icons/market.png \
   qt/res/icons/network_disabled.png \
   qt/res/icons/open.png \
   qt/res/icons/overview.png \
   qt/res/icons/quit.png \
   qt/res/icons/receive.png \
   qt/res/icons/remove.png \
+  qt/res/icons/resolve.png \
   qt/res/icons/right.png \
   qt/res/icons/search.png \
   qt/res/icons/send.png \

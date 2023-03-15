@@ -1,6 +1,5 @@
 <!DOCTYPE RCC><RCC version="1.0">
     <qresource prefix="/icons">
-        <file alias="bitcoin">res/icons/bitcoin.png</file>
         <file alias="address-book">res/icons/address-book.png</file>
         <file alias="quit">res/icons/quit.png</file>
         <file alias="send">res/icons/send.png</file>
@@ -60,6 +59,11 @@
         <file alias="calculator">res/icons/calculator.png</file>
         <file alias="search">res/icons/search.png</file>
         <file alias="flip">res/icons/flip.png</file>
+        <file alias="hivemind">res/icons/hivemind.png</file>
+        <file alias="ballot">res/icons/ballot.png</file>
+        <file alias="decision">res/icons/decision.png</file>
+        <file alias="market">res/icons/market.png</file>
+        <file alias="resolve">res/icons/resolve.png</file>
     </qresource>
     <qresource prefix="/movies">
         <file alias="spinner-000">res/movies/spinner-000.png</file>
