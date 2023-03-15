@@ -151,6 +151,7 @@ QT_MOC_CPP = \
   qt/moc_macdockiconhandler.cpp \
   qt/moc_macnotificationhandler.cpp \
   qt/moc_marketspage.cpp \
+  qt/moc_markettablemodel.cpp \
   qt/moc_merkletreedialog.cpp \
   qt/moc_notificator.cpp \
   qt/moc_openuridialog.cpp \
@@ -235,6 +236,7 @@ BITCOIN_QT_H = \
   qt/macdockiconhandler.h \
   qt/macnotificationhandler.h \
   qt/marketspage.h \
+  qt/markettablemodel.h \
   qt/merkletreedialog.h \
   qt/networkstyle.h \
   qt/notificator.h \
@@ -385,6 +387,7 @@ BITCOIN_QT_WALLET_CPP = \
   qt/coincontroltreewidget.cpp \
   qt/editaddressdialog.cpp \
   qt/marketspage.cpp \
+  qt/markettablemodel.cpp \
   qt/merkletreedialog.cpp \
   qt/openuridialog.cpp \
   qt/overviewpage.cpp \
