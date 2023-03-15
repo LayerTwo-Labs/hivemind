@@ -34,6 +34,11 @@
 #include <wallet/walletdb.h>
 #include <wallet/walletutil.h>
 
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/split.hpp>
+
 #include <init.h>  // For StartShutdown
 
 #include <stdint.h>
@@ -4506,12 +4511,20 @@ UniValue createdecision(const JSONRPCRequest& request)
     pwallet->BlockUntilSyncedToCurrentChain();
 
     struct marketDecision decision;
-    // TODO
-    //CHivemindAddress address(params[0].get_str());
-    //if (!address.IsValid())
-    //    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
-    //        "Invalid Hivemind address");
-    //address.GetKeyID(obj.keyID);
+
+    // Get address
+    CTxDestination dest = DecodeDestination(request.params[0].get_str());
+    if (!IsValidDestination(dest)) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Invalid address!");
+    }
+
+    // Double checking that the destination is for a KeyID
+    const CKeyID* id = boost::get<CKeyID>(&dest);
+    if (!id) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Invalid non P2PKH destination!");
+    }
+
+    decision.keyID = *id;
     decision.branchid.SetHex(request.params[1].get_str());
     decision.prompt = request.params[2].get_str();
     decision.eventOverBy = (uint32_t) request.params[3].get_int();
@@ -4617,18 +4630,24 @@ UniValue createmarket(const JSONRPCRequest& request)
     pwallet->BlockUntilSyncedToCurrentChain();
 
     struct marketMarket market;
-    // TODO
-    //CHivemindAddress address(params[0].get_str());
-    //if (!address.IsValid())
-    //    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
-    //        "Invalid Hivemind address");
-    //address.GetKeyID(obj.keyID);
+
+    // Get address
+    CTxDestination dest = DecodeDestination(request.params[0].get_str());
+    if (!IsValidDestination(dest)) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Invalid address!");
+    }
+
+    // Double checking that the destination is for a KeyID
+    const CKeyID* id = boost::get<CKeyID>(&dest);
+    if (!id) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Invalid non P2PKH destination!");
+    }
+    market.keyID = *id;
 
     uint32_t nStates = 1;
     std::string param_decision = request.params[1].get_str();
     std::vector<string> strs;
-    // TODO
-    //boost::split(strs, param_decision, boost::algorithm::is_any_of(", "));
+    boost::split(strs, param_decision, boost::algorithm::is_any_of(", "));
     for(uint32_t i=0; i < strs.size(); i++) {
         uint256 decisionID;
         int decisionFunctionID = DFID_X1;
