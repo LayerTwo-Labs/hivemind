@@ -2221,6 +2221,16 @@ void CWallet::AvailableCoins(std::vector<COutput> &vCoins, bool fOnlySafe, const
         if (nDepth < nMinDepth || nDepth > nMaxDepth)
             continue;
 
+        if (!pcoin->tx->vout.size())
+            continue;
+
+        // TODO
+        // Old hivemind code used the accounts system to list market txs
+        // if a branchid account is selected
+        bool fMarketTx = pcoin->tx->vout[0].scriptPubKey.IsMarketScript();
+        if (fMarketTx)
+            continue;
+
         for (unsigned int i = 0; i < pcoin->tx->vout.size(); i++) {
             if (pcoin->tx->vout[i].nValue < nMinimumAmount || pcoin->tx->vout[i].nValue > nMaximumAmount)
                 continue;
