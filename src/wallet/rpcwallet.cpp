@@ -16,6 +16,7 @@
 #include <policy/fees.h>
 #include <policy/policy.h>
 #include <policy/rbf.h>
+#include <primitives/market.h>
 #include <rpc/mining.h>
 #include <rpc/rawtransaction.h>
 #include <rpc/safemode.h>
@@ -40,6 +41,11 @@
 #include <univalue.h>
 
 static const std::string WALLET_ENDPOINT_BASE = "/wallet/";
+
+static inline uint64_t rounduint64(double d)
+{
+    return (uint64_t)(d + 0.5);
+}
 
 CWallet *GetWalletForJSONRPCRequest(const JSONRPCRequest& request)
 {
@@ -4031,6 +4037,1936 @@ UniValue getaddressinfo(const JSONRPCRequest& request)
     return ret;
 }
 
+UniValue listbranches(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size())
+        throw std::runtime_error(
+            "listbranches\n"
+            "\nReturns an array of all branches.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments: None\n"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    std::vector<marketBranch> vBranch = pmarkettree->GetBranches();
+
+    UniValue response(UniValue::VARR);
+
+    for (const marketBranch& branch : vBranch) {
+        UniValue obj(UniValue::VOBJ);
+
+        obj.pushKV("branchid", branch.GetHash().ToString());
+        obj.pushKV("txid", branch.txid.ToString());
+        obj.pushKV("name", branch.name);
+        obj.pushKV("description", branch.description);
+        obj.pushKV("baselistingfee", ValueFromAmount(branch.baseListingFee));
+        obj.pushKV("freedecisions", (int)branch.freeDecisions);
+        obj.pushKV("targetdecisions", (int)branch.targetDecisions);
+        obj.pushKV("maxdecisions", (int)branch.maxDecisions);
+        obj.pushKV("mintradingfee", ValueFromAmount(branch.minTradingFee));
+        obj.pushKV("tau", (int)branch.tau);
+        obj.pushKV("ballottime", (int)branch.ballotTime);
+        obj.pushKV("unsealtime", (int)branch.unsealTime);
+        obj.pushKV("consensusthreshold", ValueFromAmount(branch.consensusThreshold));
+        obj.pushKV("alpha", ValueFromAmount(branch.alpha));
+        obj.pushKV("tol", ValueFromAmount(branch.tol));
+
+        response.push_back(obj);
+    }
+
+    return response;
+}
+
+UniValue listdecisions(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "listdecisions\n"
+            "\nReturns an array of all decisions.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. branchid     (uint256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 branchid;
+    branchid.SetHex(request.params[0].get_str());
+    // TODO obj.pushKV("branchid", branchid.ToString()));
+
+    std::vector<marketDecision> vDecision = pmarkettree->GetDecisions(branchid);
+
+    UniValue response(UniValue::VARR);
+
+    for (const marketDecision& decision : vDecision) {
+        UniValue obj(UniValue::VOBJ);
+
+        obj.pushKV("decisionid", decision.GetHash().ToString());
+        obj.pushKV("txid", decision.txid.ToString());
+
+        // TODO
+        //CHivemindAddress addr;
+        //if (addr.Set(obj->keyID))
+        //    obj.pushKV(("keyID", addr.ToString()));
+        obj.pushKV("branchid", decision.branchid.ToString());
+        obj.pushKV("prompt", decision.prompt);
+        obj.pushKV("eventoverby", (int)decision.eventOverBy);
+        obj.pushKV("isScaled", (int)decision.isScaled);
+        obj.pushKV("min", ValueFromAmount(decision.min));
+        obj.pushKV("max", ValueFromAmount(decision.max));
+        obj.pushKV("answerOptionality", (int)decision.answerOptionality);
+
+        response.push_back(obj);
+    }
+
+    return response;
+}
+
+UniValue listmarkets(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "listmarkets\n"
+            "\nReturns an array of all markets depending on decision.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. decisionid      (uint256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 decisionid;
+    decisionid.SetHex(request.params[0].get_str());
+
+    std::vector<marketMarket> vMarket = pmarkettree->GetMarkets(decisionid);
+
+    UniValue response(UniValue::VARR);
+
+    for (const marketMarket& market : vMarket) {
+        UniValue obj(UniValue::VOBJ);
+
+        obj.pushKV("marketid", market.GetHash().ToString());
+        obj.pushKV("txid", market.txid.ToString());
+        // CHivemindAddress addr;
+        // if (addr.Set(obj->keyID))
+        //    obj.pushKV("keyID", addr.ToString());
+        obj.pushKV("B", ValueFromAmount(market.B));
+        obj.pushKV("tradingFee", ValueFromAmount(market.tradingFee));
+        obj.pushKV("maxCommission", ValueFromAmount(market.maxCommission));
+        obj.pushKV("title", market.title);
+        obj.pushKV("description", market.description);
+        obj.pushKV("tags", market.tags);
+        obj.pushKV("maturation", (int)market.maturation);
+
+        UniValue darray(UniValue::VARR);
+        for(uint32_t i=0; i < market.decisionIDs.size(); i++)
+            darray.pushKV("decisionid", market.decisionIDs[i].ToString());
+        obj.pushKV("decisionIDs", darray);
+
+        response.push_back(obj);
+    }
+
+    return response;
+}
+
+UniValue listoutcomes(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "listoutcomes\n"
+            "\nReturns an array of all outcomes in a branch.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1.branchid      (uint256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 branchid;
+    branchid.SetHex(request.params[0].get_str());
+
+    std::vector<marketOutcome> vOutcome = pmarkettree->GetOutcomes(branchid);
+
+    UniValue response(UniValue::VARR);
+
+    for (const marketOutcome& outcome : vOutcome) {
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("outcomeid", outcome.GetHash().ToString());
+        obj.pushKV("height", (int)outcome.nHeight);
+        response.push_back(obj);
+    }
+
+    return response;
+}
+
+UniValue listtrades(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "listtrades\n"
+            "\nReturns an array of all trades for the market.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. marketid      (uint256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 marketid;
+    marketid.SetHex(request.params[0].get_str());
+
+
+    std::vector<marketTrade> vTrade = pmarkettree->GetTrades(marketid);
+
+    UniValue response(UniValue::VARR);
+
+    for (const marketTrade& trade : vTrade) {
+        UniValue obj(UniValue::VOBJ);
+
+        obj.pushKV("tradeid", trade.GetHash().ToString());
+        obj.pushKV("txid", trade.txid.ToString());
+        // TODO
+        //CHivemindAddress addr;
+        //if (addr.Set(keyID))
+        //    obj.pushKV("keyID", trade.addr.ToString());
+        obj.pushKV("marketid", trade.marketid.ToString());
+        obj.pushKV("isbuy", (trade.isBuy)? "buy":"sell");
+        obj.pushKV("nshares", ValueFromAmount(trade.nShares));
+        obj.pushKV("price", ValueFromAmount(trade.price));
+        obj.pushKV("decision_state", (int)trade.decisionState);
+        obj.pushKV("nonce", (int)trade.nonce);
+        response.push_back(obj);
+    }
+
+    return response;
+}
+
+UniValue listvotes(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 2)
+        throw std::runtime_error(
+            "listtrades\n"
+            "\nReturns an array of all votes for the ballot.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. branchid      (uint256 string)"
+            "\n2. height        (numeric)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 branchid;
+    branchid.SetHex(request.params[0].get_str());
+
+    uint32_t nHeight = request.params[1].get_int();
+
+    std::vector<marketRevealVote> vVote = pmarkettree->GetRevealVotes(branchid, nHeight);
+
+    UniValue response(UniValue::VARR);
+
+    for (const marketRevealVote& vote : vVote) {
+        UniValue obj(UniValue::VOBJ);
+        obj.pushKV("voteid", vote.ToString());
+        obj.pushKV("txid", vote.txid.ToString());
+        obj.pushKV("NA", ValueFromAmount(vote.NA));
+
+        UniValue darray(UniValue::VARR);
+        for(uint32_t i = 0; i < vote.decisionIDs.size(); i++) {
+            UniValue decision(UniValue::VOBJ);
+            decision.pushKV("decisionid", vote.decisionIDs[i].ToString());
+            if (i < vote.decisionVotes.size())
+                decision.pushKV("vote", ValueFromAmount(vote.decisionVotes[i]));
+
+            darray.push_back(decision);
+        }
+        response.push_back(obj);
+    }
+
+    return response;
+}
+
+UniValue createbranch(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 13)
+        throw std::runtime_error(
+            "createbranch\n"
+            "\n\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. name                (string) the name of the branch"
+            "\n2. description         (string) a short description of the branch"
+            "\n3. baselistingfee      (numeric)"
+            "\n4. freedecisions       (numeric < 65536)"
+            "\n5. targetdecisions     (numeric < 65536)"
+            "\n6. maxdecisions        (numeric < 65536)"
+            "\n7. mintradingfee       (numeric)"
+            "\n8. tau                 (block number < 65536)"
+            "\n9. ballottime          (block number < 65536)"
+            "\n10. unsealtime         (block number < 65536)"
+            "\n11. consensusthreshold (numeric)"
+            "\n12. alpha (numeric)"
+            "\n13. tol (numeric)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    ObserveSafeMode();
+
+    // Make sure the results are valid at least up to the most recent block
+    // the user could have gotten from another RPC command prior to now
+    pwallet->BlockUntilSyncedToCurrentChain();
+
+    struct marketBranch branch;
+    branch.name = request.params[0].get_str();
+    branch.description = request.params[1].get_str();
+    branch.baseListingFee = (uint64_t)request.params[2].get_int();
+    branch.freeDecisions = (uint16_t)request.params[3].get_int();
+    branch.targetDecisions = (uint16_t)request.params[4].get_int();
+    branch.maxDecisions = (uint16_t)request.params[5].get_int();
+    branch.minTradingFee = (uint64_t)request.params[6].get_int();
+    branch.tau = (uint16_t)request.params[7].get_int();
+    branch.ballotTime = (uint16_t)request.params[8].get_int();
+    branch.unsealTime = (uint16_t)request.params[9].get_int();
+    branch.consensusThreshold = (uint64_t)request.params[10].get_int();
+    branch.alpha = (uint64_t)request.params[11].get_int();
+    branch.tol = (uint64_t)request.params[12].get_int();
+
+    // Check if object is a duplicate
+    uint256 objid = branch.GetHash();
+    marketBranch tmpBranch;
+    if (pmarkettree->GetBranch(objid, tmpBranch)) {
+        string strError = std::string("Error: branchid ")
+        + objid.ToString() + " already exists!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    LOCK2(cs_main, pwallet->cs_wallet);
+    EnsureWalletIsUnlocked(pwallet);
+
+    // create output script
+    CScript scriptPubKey = branch.GetScript();
+
+    CAmount nValue = 1 * CENT;
+
+    // Create and send the transaction
+    CWalletTx wtx;
+    CReserveKey reservekey(pwallet);
+    CAmount nFeeRequired;
+    std::string strError;
+    std::vector<CRecipient> vecSend;
+    CCoinControl coin_control;
+    int nChangePosRet = -1;
+    CRecipient recipient = {scriptPubKey, nValue, true};
+    vecSend.push_back(recipient);
+    if (!pwallet->CreateTransaction(vecSend, wtx, reservekey, nFeeRequired, nChangePosRet, strError, coin_control)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+    CValidationState state;
+    if (!pwallet->CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
+        strError = strprintf("Error: The transaction was rejected! Reason given: %s", FormatStateMessage(state));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("txid", wtx.GetHash().ToString());
+    obj.pushKV("branchid", objid.ToString());
+
+    return obj;
+}
+
+UniValue createdecision(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || (request.params.size() != 6 && request.params.size() != 8))
+        throw std::runtime_error(
+            "createdecision\n"
+            "\nCreates a new decision within the branch.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. address             (base58 address)"
+            "\n2. branchid            (uint256 string)"
+            "\n3. prompt              (string)"
+            "\n4. eventoverby         (block number)"
+            "\n5. answer optionality  (false=mandatory to answer, true=optional to answer)"
+            "\n6. is_scaled           (boolean)"
+            "\n7. scaled min          (if scaled, numeric)"
+            "\n8. scaled max          (if scaled, numeric)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    ObserveSafeMode();
+
+    // Make sure the results are valid at least up to the most recent block
+    // the user could have gotten from another RPC command prior to now
+    pwallet->BlockUntilSyncedToCurrentChain();
+
+    struct marketDecision decision;
+    // TODO
+    //CHivemindAddress address(params[0].get_str());
+    //if (!address.IsValid())
+    //    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+    //        "Invalid Hivemind address");
+    //address.GetKeyID(obj.keyID);
+    decision.branchid.SetHex(request.params[1].get_str());
+    decision.prompt = request.params[2].get_str();
+    decision.eventOverBy = (uint32_t) request.params[3].get_int();
+    decision.answerOptionality = (request.params[4].get_bool())? 1: 0;
+    decision.isScaled = (request.params[5].get_bool())? 1: 0;
+    if ((decision.isScaled) && (request.params.size() != 8))
+        throw JSONRPCError(RPC_WALLET_ERROR, "Missing params!\n");
+    decision.min = (request.params.size() == 6)? CAmount(0): AmountFromValue(request.params[6]);
+    decision.max = (request.params.size() == 6)? 1 * COIN: AmountFromValue(request.params[7]);
+
+    // Check if branch exists
+    marketBranch branch;
+    if (!pmarkettree->GetBranch(decision.branchid, branch)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Branch not found!\n");
+    }
+
+    // Check if decision already exists
+    marketDecision tmpDecision;
+    if (pmarkettree->GetDecision(decision.GetHash(), tmpDecision)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Decision already exists!\n");
+    }
+
+    LOCK2(cs_main, pwallet->cs_wallet);
+    EnsureWalletIsUnlocked(pwallet);
+
+    // create output script
+    CScript scriptPubKey = decision.GetScript();
+
+    CAmount nValue = 1 * CENT;
+
+    // Create and send the transaction
+    CWalletTx wtx;
+    CReserveKey reservekey(pwallet);
+    CAmount nFeeRequired;
+    std::string strError;
+    std::vector<CRecipient> vecSend;
+    CCoinControl coin_control;
+    int nChangePosRet = -1;
+    CRecipient recipient = {scriptPubKey, nValue, true};
+    vecSend.push_back(recipient);
+    if (!pwallet->CreateTransaction(vecSend, wtx, reservekey, nFeeRequired, nChangePosRet, strError, coin_control)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+    CValidationState state;
+    if (!pwallet->CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
+        strError = strprintf("Error: The transaction was rejected! Reason given: %s", FormatStateMessage(state));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("txid", wtx.GetHash().ToString());
+    obj.pushKV("decisionid", decision.GetHash().ToString());
+
+    return obj;
+}
+
+UniValue createmarket(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 11)
+        throw std::runtime_error(
+            "createmarket\n"
+            "\nCreates a new market on the decisions.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. address             (base58 address)"
+            "\n2. decisionid[,...]    (comma-separated list of decisions)"
+            "\n3. B                   (numeric) liquidity parameter"
+            "\n4. tradingfee          (numeric)"
+            "\n5. max commission      (numeric)"
+            "\n6. title               (string)"
+            "\n7. description         (string)"
+            "\n8. tags[,...]          (comma-separated list of strings)"
+            "\n9. maturation          (block number)"
+            "\n10. tx PoW hash id     (numeric)"
+            "\n11. tx PoW difficulty  (numeric)"
+            "\nEach decisionid is a hash of a decision optionally followed by a function code."
+            "\nThe available function codes are"
+            "\n    :X1   X, identity [default]"
+            "\n    :X2   X^2"
+            "\n    :X3   X^3"
+            "\n    :LNX1  LN(X)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    ObserveSafeMode();
+
+    // Make sure the results are valid at least up to the most recent block
+    // the user could have gotten from another RPC command prior to now
+    pwallet->BlockUntilSyncedToCurrentChain();
+
+    struct marketMarket market;
+    // TODO
+    //CHivemindAddress address(params[0].get_str());
+    //if (!address.IsValid())
+    //    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+    //        "Invalid Hivemind address");
+    //address.GetKeyID(obj.keyID);
+
+    uint32_t nStates = 1;
+    std::string param_decision = request.params[1].get_str();
+    std::vector<string> strs;
+    // TODO
+    //boost::split(strs, param_decision, boost::algorithm::is_any_of(", "));
+    for(uint32_t i=0; i < strs.size(); i++) {
+        uint256 decisionID;
+        int decisionFunctionID = DFID_X1;
+        size_t separator = strs[i].find(":");
+        if (separator != std::string::npos) {
+            std::string function_code = strs[i].substr(separator+1);
+            decisionFunctionID = decisionFunctionToInt(function_code);
+            if (decisionFunctionID < 0) {
+                string strError = std::string("Error: decision function ")
+                    + function_code + " does not exist!";
+                throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+            }
+            strs[i].erase(separator);
+        }
+        decisionID.SetHex(strs[i].c_str());
+
+        marketDecision decision;
+        if (!pmarkettree->GetDecision(decisionID, decision)) {
+            string strError = std::string("Error: decisionID ")
+                + decisionID.ToString() + " does not exist!";
+            throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+        }
+
+        market.decisionIDs.push_back(decisionID);
+        market.decisionFunctionIDs.push_back(decisionFunctionID);
+
+        nStates *= 2;
+    }
+    if ((!market.decisionIDs.size()) || (nStates == 1)) {
+        string strError = std::string("Error: There are no decisionids!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+    market.B = (uint64_t)request.params[2].get_int();
+    market.tradingFee = (uint64_t)request.params[3].get_int();
+    market.maxCommission = (uint64_t)request.params[4].get_int();
+    market.title = request.params[5].get_str();
+    market.description = request.params[6].get_str();
+    market.tags = request.params[7].get_str();
+    market.maturation = (uint32_t)request.params[8].get_int();
+    market.txPoWh = (uint32_t)request.params[9].get_int();
+    market.txPoWd = (uint32_t)request.params[10].get_int();
+
+    // TODO use this???
+    double capitalrequired = marketAccountValue(market.maxCommission, 1e-8*market.B, nStates, NULL);
+
+    // Check if market already exists
+    marketMarket tmpMarket;
+    if (pmarkettree->GetMarket(market.GetHash(), tmpMarket)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Market already exists!\n");
+    }
+
+    LOCK2(cs_main, pwallet->cs_wallet);
+    EnsureWalletIsUnlocked(pwallet);
+
+    // create output script
+    CScript scriptPubKey = market.GetScript();
+
+    CAmount nValue = 1 * CENT;
+
+    // Create and send the transaction
+    CWalletTx wtx;
+    CReserveKey reservekey(pwallet);
+    CAmount nFeeRequired;
+    std::string strError;
+    std::vector<CRecipient> vecSend;
+    CCoinControl coin_control;
+    int nChangePosRet = -1;
+    CRecipient recipient = {scriptPubKey, nValue, true};
+    vecSend.push_back(recipient);
+    if (!pwallet->CreateTransaction(vecSend, wtx, reservekey, nFeeRequired, nChangePosRet, strError, coin_control)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+    CValidationState state;
+    if (!pwallet->CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
+        strError = strprintf("Error: The transaction was rejected! Reason given: %s", FormatStateMessage(state));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("txid", wtx.GetHash().ToString());
+    obj.pushKV("marketid", market.GetHash().ToString());
+
+    return obj;
+}
+
+UniValue createtrade(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || (request.params.size() != 6 && request.params.size() != 7))
+        throw std::runtime_error(
+            "createtrade\n"
+            "\nCreates a new trade order in the market.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\nResult:\n"
+            "\n1. address             (base58 address)"
+            "\n2. marketid            (u256 string)"
+            "\n3. buy_or_sell         (string)"
+            "\n4. number_shares       (numeric)"
+            "\n5. price               (numeric)"
+            "\n6. decision_state      (string)"
+            "\n7. nonce               (optional numeric)"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    ObserveSafeMode();
+
+    // Make sure the results are valid at least up to the most recent block
+    // the user could have gotten from another RPC command prior to now
+    pwallet->BlockUntilSyncedToCurrentChain();
+
+    struct marketTrade trade;
+
+    // TODO
+    //
+    //CHivemindAddress address(params[0].get_str());
+    //if (!address.IsValid())
+    //    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
+    //        "Invalid Hivemind address");
+    //address.GetKeyID(obj.keyID);
+
+
+        /* Add market id to the object, checked later (performance) */
+    trade.marketid.SetHex(request.params[1].get_str());
+
+    /* double-check buy_or_sell */
+    std::string buy_or_sell = request.params[2].get_str();
+    if ((buy_or_sell != "buy") && (buy_or_sell != "sell")) {
+        string strError = std::string("Error: '")
+            + buy_or_sell + "' must be buy or sell!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    /* double-check nShares */
+    if (request.params[3].get_real() <= 0.0) {
+        char tmp[32];
+        snprintf(tmp, sizeof(tmp), "%.8f", request.params[3].get_real());
+        string strError = std::string("Error: number of shares ")
+            + tmp + " must be positive!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    /* double-check price */
+    if (request.params[4].get_real() <= 0.0) {
+        char tmp[32];
+        snprintf(tmp, sizeof(tmp), "%.8f", request.params[4].get_real());
+        string strError = std::string("Error: price ")
+            + tmp + " must be positive!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    /* double-check marketid */
+    marketMarket market;
+    if (!pmarkettree->GetMarket(trade.marketid, market)) {
+        string strError = std::string("Error: marketid ")
+            + trade.marketid.ToString() + " does not exist!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    // Add params to the trade object
+    trade.isBuy = (buy_or_sell == "buy")? true: false;
+    trade.nShares = (uint64_t)request.params[3].get_int();
+    trade.price = (uint64_t)request.params[4].get_int();
+    trade.decisionState = (uint32_t)request.params[5].get_int();
+    trade.nonce = (request.params.size() != 7)? 0: (uint32_t)request.params[6].get_int();
+
+    /* double-check decisionState */
+    uint32_t nStates = marketNStates(market);
+    if (trade.decisionState >= nStates) {
+        char tmp0[32];
+        snprintf(tmp0, sizeof(tmp0), "%u", trade.decisionState);
+        char tmp1[32];
+        snprintf(tmp1, sizeof(tmp1), "%u", nStates);
+        string strError = std::string("Error: decision state ")
+            + tmp0 + " is above the number of states "
+            + tmp1 + " in the market!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    // TODO: Increase nonce for repeated trades
+    /* double-check object is not a duplicate */
+    uint256 objid = trade.GetHash();
+    marketTrade tmpTrade;
+    if (pmarkettree->GetTrade(objid, tmpTrade)) {
+        string strError = std::string("Error: tradeid ")
+            + objid.ToString() + " already exists!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    /* trades of the market */
+    vector<marketTrade> vTrades = pmarkettree->GetTrades(market.GetHash());
+
+    /* current shares of the market */
+    double *nShares = new double [nStates];
+    marketNShares(vTrades, nStates, nShares);
+    double currAccount = marketAccountValue(market.maxCommission, 1e-8*market.B, nStates, nShares);
+
+    /* new shares to be added to the market */
+    nShares[trade.decisionState] += (trade.isBuy)? 1e-8*trade.nShares: -1e-8*trade.nShares;
+    double nextAccount = marketAccountValue(market.maxCommission, 1e-8*market.B, nStates, nShares);
+
+    /* the price difference to move from the current to the new */
+    double price = (trade.isBuy)? (nextAccount - currAccount) / (1e-8 * trade.nShares)
+        : (currAccount - nextAccount) / (1e-8 * trade.nShares);
+
+    // TODO use ???
+    double totalCost = price * (1e-8 * trade.nShares);
+
+    if ((trade.isBuy) && (1e-8*price > 1e-8*trade.price)) {
+        string strError = std::string("Error: price needs to be at least ")
+            + FormatMoney(price);
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    LOCK2(cs_main, pwallet->cs_wallet);
+    EnsureWalletIsUnlocked(pwallet);
+
+    // create output script
+    CScript scriptPubKey = trade.GetScript();
+
+    CAmount nValue = 1 * CENT;
+
+    // Create and send the transaction
+    CWalletTx wtx;
+    CReserveKey reservekey(pwallet);
+    CAmount nFeeRequired;
+    std::string strError;
+    std::vector<CRecipient> vecSend;
+    CCoinControl coin_control;
+    int nChangePosRet = -1;
+    CRecipient recipient = {scriptPubKey, nValue, true};
+    vecSend.push_back(recipient);
+    if (!pwallet->CreateTransaction(vecSend, wtx, reservekey, nFeeRequired, nChangePosRet, strError, coin_control)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+    CValidationState state;
+    if (!pwallet->CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
+        strError = strprintf("Error: The transaction was rejected! Reason given: %s", FormatStateMessage(state));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("txid", wtx.GetHash().ToString());
+    obj.pushKV("tradeid", trade.GetHash().ToString());
+    obj.pushKV("B", 1e-8*market.B);
+    obj.pushKV("buy_or_sell", buy_or_sell);
+    obj.pushKV("nShares", nShares);
+    obj.pushKV("price", price);
+    obj.pushKV("total", ((1e-8 * trade.nShares))*price);
+
+    delete nShares;
+
+    return obj;
+}
+
+UniValue createsealedvote(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 3)
+        throw std::runtime_error(
+            "createsealedvote\n"
+            "\nCreates a new sealedvote for the branch height.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. branchid            (u256 string)"
+            "\n2. height              (numeric)"
+            "\n3. voteid              (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    ObserveSafeMode();
+
+    // Make sure the results are valid at least up to the most recent block
+    // the user could have gotten from another RPC command prior to now
+    pwallet->BlockUntilSyncedToCurrentChain();
+
+    struct marketSealedVote vote;
+    vote.branchid.SetHex(request.params[0].get_str());
+    vote.height = request.params[1].get_int();
+    vote.voteid.SetHex(request.params[2].get_str());
+
+    // Check if branch exists
+    marketBranch branch;
+    if (!pmarkettree->GetBranch(vote.branchid, branch)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Branch not found!\n");
+    }
+
+    // Validate vote nHeight
+    if (vote.height % branch.tau != 0) {
+        string strError = std::string("Error: Invalid height ")
+            + " for the branch's tau!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    LOCK2(cs_main, pwallet->cs_wallet);
+    EnsureWalletIsUnlocked(pwallet);
+
+    // create output script
+    CScript scriptPubKey = vote.GetScript();
+
+    CAmount nValue = 1 * CENT;
+
+    // TODO
+    // Use votecoins to pay for the vote
+    //string strAccount = obj.branchid.ToString();
+    //CHivemindAddress voterAddress = GetBranchAccountAddress(strAccount);
+    //
+    //CCoinControl *control = new CCoinControl;
+    //control->destChange = voterAddress.Get();
+
+    // Create and send the transaction
+    CWalletTx wtx;
+    CReserveKey reservekey(pwallet);
+    CAmount nFeeRequired;
+    std::string strError;
+    std::vector<CRecipient> vecSend;
+    CCoinControl coin_control;
+    int nChangePosRet = -1;
+    CRecipient recipient = {scriptPubKey, nValue, true};
+    vecSend.push_back(recipient);
+    if (!pwallet->CreateTransaction(vecSend, wtx, reservekey, nFeeRequired, nChangePosRet, strError, coin_control)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+    CValidationState state;
+    if (!pwallet->CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
+        strError = strprintf("Error: The transaction was rejected! Reason given: %s", FormatStateMessage(state));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("txid", wtx.GetHash().ToString());
+    obj.pushKV("sealedvoteid", vote.GetHash().ToString());
+
+    return obj;
+}
+
+UniValue createstealvote(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 3)
+        throw std::runtime_error(
+            "createstealvote\n"
+            "\nCreates a new stealvote for vote.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. branchid            (u256 string)"
+            "\n2. height              (numeric)"
+            "\n3. voteid              (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    ObserveSafeMode();
+
+    // Make sure the results are valid at least up to the most recent block
+    // the user could have gotten from another RPC command prior to now
+    pwallet->BlockUntilSyncedToCurrentChain();
+
+    struct marketStealVote vote;
+    vote.branchid.SetHex(request.params[0].get_str());
+    vote.height = request.params[1].get_int();
+    vote.voteid.SetHex(request.params[2].get_str());
+
+    // Check if branch exists
+    marketBranch branch;
+    if (!pmarkettree->GetBranch(vote.branchid, branch)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Branch not found!\n");
+    }
+
+    // Validate vote nHeight
+    if (vote.height % branch.tau != 0) {
+        string strError = std::string("Error: Invalid height ")
+            + " for the branch's tau!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    LOCK2(cs_main, pwallet->cs_wallet);
+    EnsureWalletIsUnlocked(pwallet);
+
+    // create output script
+    CScript scriptPubKey = vote.GetScript();
+
+    CAmount nValue = 1 * CENT;
+
+    // TODO
+    // Use votecoins to pay for the vote
+    //string strAccount = obj.branchid.ToString();
+    //CHivemindAddress voterAddress = GetBranchAccountAddress(strAccount);
+    //
+    //CCoinControl *control = new CCoinControl;
+    //control->destChange = voterAddress.Get();
+
+    // Create and send the transaction
+    CWalletTx wtx;
+    CReserveKey reservekey(pwallet);
+    CAmount nFeeRequired;
+    std::string strError;
+    std::vector<CRecipient> vecSend;
+    CCoinControl coin_control;
+    int nChangePosRet = -1;
+    CRecipient recipient = {scriptPubKey, nValue, true};
+    vecSend.push_back(recipient);
+    if (!pwallet->CreateTransaction(vecSend, wtx, reservekey, nFeeRequired, nChangePosRet, strError, coin_control)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+    CValidationState state;
+    if (!pwallet->CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
+        strError = strprintf("Error: The transaction was rejected! Reason given: %s", FormatStateMessage(state));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("txid", wtx.GetHash().ToString());
+    obj.pushKV("stealvoteid", vote.GetHash().ToString());
+
+    return obj;
+}
+
+UniValue createrevealvote(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 3)
+        throw std::runtime_error(
+            "createrevealvote\n"
+            "\nReveal the vote from a sealed vote.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. address           (u256 string)"
+            "\n2. branchid          (u256 string)"
+            "\n3. height            (numeric)"
+            "\n4. voteid            (u256 string)"
+            "\n5. NA                (u256 string)"
+            "\n6. decisionid,vote   (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    ObserveSafeMode();
+
+    // Make sure the results are valid at least up to the most recent block
+    // the user could have gotten from another RPC command prior to now
+    pwallet->BlockUntilSyncedToCurrentChain();
+
+    struct marketRevealVote vote;
+
+
+    // TODO
+    // CHivemindAddress address;
+    // address.is_votecoin = 1;
+    // address.SetString(params[0].get_str());
+    // if (!address.IsValid())
+    //    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Votecoin address");
+    vote.branchid.SetHex(request.params[1].get_str());
+    vote.height = request.params[2].get_int();
+    vote.voteid.SetHex(request.params[3].get_str());
+    // TODO ??? vote.NA.SetHex(request.params[4].get_str());
+
+    // Check if branch exists
+    marketBranch branch;
+    if (!pmarkettree->GetBranch(vote.branchid, branch)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Branch not found!\n");
+    }
+
+    // Validate vote nHeight
+    if (vote.height % branch.tau != 0) {
+        string strError = std::string("Error: Invalid height ")
+            + " for the branch's tau!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    /* record the ballot */
+    vector<uint256> decisionIDs;
+    vector<uint64_t> decisionVotes;
+    for(uint32_t i=5; i < request.params.size(); i++) {
+        string str = request.params[i].get_str();
+        size_t separator = str.find(",");
+        if (separator == std::string::npos) {
+            string strError = std::string("Error: decisionid,vote ")
+                + str + " is not in correct form!";
+            throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+        }
+        std::string strVote = str.substr(separator+1);
+        str.erase(separator);
+        uint256 decisionid;
+        decisionid.SetHex(str.c_str());
+        vote.decisionIDs.push_back(decisionid);
+        vote.decisionVotes.push_back(rounduint64(atof(strVote.c_str())* COIN));
+    }
+
+
+    LOCK2(cs_main, pwallet->cs_wallet);
+    EnsureWalletIsUnlocked(pwallet);
+
+    // create output script
+    CScript scriptPubKey = vote.GetScript();
+
+    CAmount nValue = 1 * CENT;
+
+    // TODO
+    // Use votecoins to pay for the vote
+    //string strAccount = obj.branchid.ToString();
+    //CHivemindAddress voterAddress = GetBranchAccountAddress(strAccount);
+    //
+    //CCoinControl *control = new CCoinControl;
+    //control->destChange = voterAddress.Get();
+
+    // Create and send the transaction
+    CWalletTx wtx;
+    CReserveKey reservekey(pwallet);
+    CAmount nFeeRequired;
+    std::string strError;
+    std::vector<CRecipient> vecSend;
+    CCoinControl coin_control;
+    int nChangePosRet = -1;
+    CRecipient recipient = {scriptPubKey, nValue, true};
+    vecSend.push_back(recipient);
+    if (!pwallet->CreateTransaction(vecSend, wtx, reservekey, nFeeRequired, nChangePosRet, strError, coin_control)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+    CValidationState state;
+    if (!pwallet->CommitTransaction(wtx, reservekey, g_connman.get(), state)) {
+        strError = strprintf("Error: The transaction was rejected! Reason given: %s", FormatStateMessage(state));
+        throw JSONRPCError(RPC_WALLET_ERROR, strError);
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("txid", wtx.GetHash().ToString());
+    obj.pushKV("voteid", vote.GetHash().ToString());
+
+    return obj;
+}
+
+UniValue getbranch(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getbranch\n"
+            "\nReturns the branch.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. branchid          (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 branchid;
+    branchid.SetHex(request.params[0].get_str());
+
+    marketBranch branch;
+    if (!pmarkettree->GetBranch(branchid, branch)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Branch not found!\n");
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("branchid", branchid.ToString());
+    obj.pushKV("txid", branch.txid.ToString());
+    obj.pushKV("name", branch.name);
+    obj.pushKV("description", branch.description);
+    obj.pushKV("baselistingfee", ValueFromAmount(branch.baseListingFee));
+    obj.pushKV("freedecisions", (int)branch.freeDecisions);
+    obj.pushKV("targetdecisions", (int)branch.targetDecisions);
+    obj.pushKV("maxdecisions", (int)branch.maxDecisions);
+    obj.pushKV("mintradingfee", ValueFromAmount(branch.minTradingFee));
+    obj.pushKV("tau", (int)branch.tau);
+    obj.pushKV("ballottime", (int)branch.ballotTime);
+    obj.pushKV("unsealtime", (int)branch.unsealTime);
+    obj.pushKV("consensusthreshold", ValueFromAmount(branch.consensusThreshold));
+
+    return obj;
+}
+
+UniValue getdecision(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getdecision\n"
+            "\nReturns the decision.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. decisionid          (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 decisionid;
+    decisionid.SetHex(request.params[0].get_str());
+
+    marketDecision decision;
+    if (!pmarkettree->GetDecision(decisionid, decision)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Decision not found!\n");
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("decisionid", decisionid.ToString());
+    obj.pushKV("txid", decision.txid.ToString());
+    // TODO
+    // CHivemindAddress addr;
+    // if (addr.Set(obj->keyID))
+    //    obj.pushKV("keyID", addr.ToString()));
+    obj.pushKV("branchid", decision.branchid.ToString());
+    obj.pushKV("prompt", decision.prompt);
+    obj.pushKV("eventoverby", (int)decision.eventOverBy);
+    obj.pushKV("isScaled", (int)decision.isScaled);
+    obj.pushKV("min", ValueFromAmount(decision.min));
+    obj.pushKV("max", ValueFromAmount(decision.max));
+    obj.pushKV("answerOptionality", (int)decision.answerOptionality);
+
+    return obj;
+}
+
+UniValue getmarket(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getmarket\n"
+            "\nReturns the market.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. marketid          (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 marketid;
+    marketid.SetHex(request.params[0].get_str());
+
+    marketMarket market;
+    if (!pmarkettree->GetMarket(marketid, market)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Market not found!\n");
+    }
+
+    // Get market trades
+    std::vector<marketTrade> vTrade = pmarkettree->GetTrades(market.GetHash());
+
+    /* current shares of the market */
+    uint32_t nStates = marketNStates(market);
+    double *nShares = new double [nStates];
+    marketNShares(vTrade, nStates, nShares);
+
+    /* current account value */
+    double currAccount = marketAccountValue(market.maxCommission, 1e-8*market.B, nStates, nShares);
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("marketid", marketid.ToString());
+    obj.pushKV("txid", market.txid.ToString());
+    // TODO
+    // CHivemindAddress addr;
+    // if (addr.Set(obj->keyID))
+    //    obj.pushKV("keyID", addr.ToString()));
+    obj.pushKV("B", ValueFromAmount(market.B));
+    obj.pushKV("tradingFee", ValueFromAmount(market.tradingFee));
+    obj.pushKV("maxCommission", ValueFromAmount(market.maxCommission));
+    obj.pushKV("title", market.title);
+    obj.pushKV("description", market.description);
+    obj.pushKV("tags", market.tags);
+    obj.pushKV("maturation", (int)market.maturation);
+    obj.pushKV("txPoWh", (int)market.txPoWh);
+    obj.pushKV("txPoWd", (int)market.txPoWd);
+
+    UniValue array(UniValue::VARR);
+    for(uint32_t i=0; i < market.decisionIDs.size(); i++) {
+        string str = market.decisionIDs[i].ToString();
+        str += ":";
+        if (i < market.decisionFunctionIDs.size())
+            str += decisionFunctionIDToString(market.decisionFunctionIDs[i]);
+        array.pushKV("id:function", str);
+    }
+    obj.pushKV("decisions", array);
+
+    for(uint32_t i=0; i < nStates; i++) {
+        char tmp[32];
+        snprintf(tmp, sizeof(tmp), "nShares%u", i);
+        obj.pushKV(tmp, nShares[i]);
+    }
+
+    obj.pushKV("currAccount", currAccount);
+
+    delete nShares;
+
+    return obj;
+}
+
+UniValue getoutcome(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getoutcome\n"
+            "\nReturns the outcome.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. outcomeid          (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 outcomeid;
+    outcomeid.SetHex(request.params[0].get_str());
+
+    marketOutcome outcome;
+    if (!pmarkettree->GetOutcome(outcomeid, outcome)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Outcome not found!\n");
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("outcomeid", outcomeid.ToString());
+    obj.pushKV("txid", outcome.txid.ToString());
+    obj.pushKV("nVoters", (int)outcome.nVoters);
+    obj.pushKV("nDecisions", (int)outcome.nDecisions);
+    obj.pushKV("NA", ValueFromAmount(outcome.NA));
+    obj.pushKV("tol", ValueFromAmount(outcome.tol));
+    obj.pushKV("alpha", ValueFromAmount(outcome.alpha));
+
+    UniValue arrayVote(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.voteMatrix.size(); i++)
+        arrayVote.pushKV(std::to_string(i), ValueFromAmount(outcome.voteMatrix[i]));
+    obj.pushKV("voteMatrix", arrayVote);
+
+        /* Voter Vectors */
+    UniValue voterIDs(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.voterIDs.size(); i++)
+        voterIDs.pushKV(std::to_string(i), outcome.voterIDs[i].ToString());
+    obj.pushKV("voterIDs", voterIDs);
+
+    UniValue oldRep(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.oldRep.size(); i++)
+        oldRep.pushKV(std::to_string(i), ValueFromAmount(outcome.oldRep[i]));
+    obj.pushKV("oldRep", oldRep);
+
+    UniValue thisRep(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.thisRep.size(); i++)
+        thisRep.pushKV(std::to_string(i), ValueFromAmount(outcome.thisRep[i]));
+    obj.pushKV("thisRep", oldRep);
+
+    UniValue smoothedRep(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.smoothedRep.size(); i++)
+        smoothedRep.pushKV(std::to_string(i), ValueFromAmount(outcome.smoothedRep[i]));
+    obj.pushKV("smoothedRep", oldRep);
+
+    UniValue NARow(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.NARow.size(); i++)
+        NARow.pushKV(std::to_string(i), ValueFromAmount(outcome.NARow[i]));
+    obj.pushKV("NARow", oldRep);
+
+    UniValue particRow(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.particRow.size(); i++)
+        particRow.pushKV(std::to_string(i), ValueFromAmount(outcome.particRow[i]));
+    obj.pushKV("particRow", oldRep);
+
+    UniValue particRel(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.particRel.size(); i++)
+        particRel.pushKV(std::to_string(i), ValueFromAmount(outcome.particRel[i]));
+    obj.pushKV("particRel", oldRep);
+
+    UniValue rowBonus(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.rowBonus.size(); i++)
+        rowBonus.pushKV(std::to_string(i), ValueFromAmount(outcome.rowBonus[i]));
+    obj.pushKV("rowBonus", oldRep);
+
+    /* Decision Vectors */
+
+    UniValue decisionIDs(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.decisionIDs.size(); i++)
+        decisionIDs.pushKV(std::to_string(i), outcome.decisionIDs[i].ToString());
+    obj.pushKV("decisionIDs", decisionIDs);
+
+    UniValue isScaled(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.isScaled.size(); i++)
+        isScaled.pushKV(std::to_string(i), ValueFromAmount(outcome.isScaled[i]));
+    obj.pushKV("isScaled", isScaled);
+
+    UniValue firstLoading(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.firstLoading.size(); i++)
+        firstLoading.pushKV(std::to_string(i), ValueFromAmount(outcome.firstLoading[i]));
+    obj.pushKV("firstLoading", firstLoading);
+
+    UniValue decisionsRaw(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.decisionsRaw.size(); i++)
+        decisionsRaw.pushKV(std::to_string(i), ValueFromAmount(outcome.decisionsRaw[i]));
+    obj.pushKV("decisionsRaw", decisionsRaw);
+
+    UniValue consensusReward(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.consensusReward.size(); i++)
+        consensusReward.pushKV(std::to_string(i), ValueFromAmount(outcome.consensusReward[i]));
+    obj.pushKV("consensusReward", consensusReward);
+
+    UniValue certainty(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.certainty.size(); i++)
+        certainty.pushKV(std::to_string(i), ValueFromAmount(outcome.certainty[i]));
+    obj.pushKV("certainty", certainty);
+
+    UniValue NACol(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.NACol.size(); i++)
+        NACol.pushKV(std::to_string(i), ValueFromAmount(outcome.NACol[i]));
+    obj.pushKV("NACol", NACol);
+
+    UniValue particCol(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.particCol.size(); i++)
+        particCol.pushKV(std::to_string(i), ValueFromAmount(outcome.particCol[i]));
+    obj.pushKV("particCol", particCol);
+
+    UniValue authorBonus(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.authorBonus.size(); i++)
+        authorBonus.pushKV(std::to_string(i), ValueFromAmount(outcome.authorBonus[i]));
+    obj.pushKV("authorBonus", authorBonus);
+
+    UniValue decisionsFinal(UniValue::VARR);
+    for(uint32_t i=0; i < outcome.decisionsFinal.size(); i++)
+        decisionsFinal.pushKV(std::to_string(i), ValueFromAmount(outcome.decisionsFinal[i]));
+    obj.pushKV("decisionsFinal", decisionsFinal);
+
+    return obj;
+}
+
+UniValue gettrade(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "gettrade\n"
+            "\nReturns the trade.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. tradeid          (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 tradeid;
+    tradeid.SetHex(request.params[0].get_str());
+
+    marketTrade trade;
+    if (!pmarkettree->GetTrade(tradeid, trade)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Trade not found!\n");
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("tradeid", tradeid.ToString());
+    // TODO
+
+    return obj;
+}
+
+UniValue getsealedvote(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getsealedvote\n"
+            "\nReturns the vote.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. voteid          (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 voteid;
+    voteid.SetHex(request.params[0].get_str());
+
+    marketSealedVote vote;
+    if (!pmarkettree->GetSealedVote(voteid, vote)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Vote not found!\n");
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("voteid", voteid.ToString());
+    obj.pushKV("branchid", vote.branchid.ToString());
+    obj.pushKV("height", (int)vote.height);
+    obj.pushKV("txid", vote.txid.ToString());
+
+    return obj;
+}
+
+UniValue getrevealvote(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getrevealvote\n"
+            "\nReturns the vote.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. voteid          (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 voteid;
+    voteid.SetHex(request.params[0].get_str());
+
+    marketRevealVote vote;
+    if (!pmarkettree->GetRevealVote(voteid, vote)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Vote not found!\n");
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("voteid", voteid.ToString());
+    obj.pushKV("branchid", vote.branchid.ToString());
+    obj.pushKV("height", (int)vote.height);
+    obj.pushKV("txid", vote.txid.ToString());
+
+    // Get decision ID(s)
+    UniValue decisionArray(UniValue::VARR);
+    for (unsigned int i = 0; i < vote.decisionIDs.size(); i++) {
+        decisionArray.pushKV(std::to_string(i), vote.decisionIDs.at(i).GetHex());
+    }
+
+    obj.pushKV("decisions", decisionArray);
+
+    // Get decision vote(s)
+    UniValue voteArray(UniValue::VARR);
+    for (unsigned int i = 0; i < vote.decisionVotes.size(); i++) {
+        voteArray.pushKV(std::to_string(i), (int)vote.decisionVotes.at(i));
+    }
+
+    obj.pushKV("votes", voteArray);
+
+    return obj;
+}
+
+UniValue getstealvote(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getstealvote\n"
+            "\nReturns the vote.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. voteid          (u256 string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 voteid;
+    voteid.SetHex(request.params[0].get_str());
+
+    marketStealVote vote;
+    if (!pmarkettree->GetStealVote(voteid, vote)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Vote not found!\n");
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("voteid", voteid.ToString());
+    obj.pushKV("branchid", vote.branchid.ToString());
+    obj.pushKV("height", (int)vote.height);
+    obj.pushKV("txid", vote.txid.ToString());
+
+    return obj;
+}
+
+UniValue getballot(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || (request.params.size() != 1 && request.params.size() != 2))
+        throw std::runtime_error(
+            "getballot\n"
+            "\nReturns the ballot (terminated decisionids) for the given branchid.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. branchid          (u256 string)"
+            "\n2. height            (optional, numeric)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    uint256 branchid;
+    branchid.SetHex(request.params[0].get_str());
+
+    marketBranch branch;
+    if (!pmarkettree->GetBranch(branchid, branch)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Branch not found!\n");
+    }
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("branchid", branchid.ToString());
+
+    uint32_t block_num = 0;
+    if (request.params.size() == 2)
+        block_num = (uint32_t) request.params[1].get_int();
+    else {
+        LOCK(cs_main);
+        block_num = chainActive.Height();
+    }
+    uint32_t minblock = branch.tau * ((block_num - 1)/ branch.tau) + 1;
+    uint32_t maxblock = minblock + branch.tau - 1;
+    obj.pushKV("minblock", (int)minblock);
+    obj.pushKV("maxblock", (int)maxblock);
+
+    UniValue array(UniValue::VARR);
+    std::vector<marketDecision> vec = pmarkettree->GetDecisions(branchid);
+    for(size_t i=0; i < vec.size(); i++) {
+        const marketDecision obj = vec[i];
+        if ((obj.eventOverBy < minblock)
+            || (obj.eventOverBy > maxblock))
+            continue;
+
+        UniValue item(UniValue::VOBJ);
+        item.pushKV("decisionid", obj.GetHash().ToString());
+        item.pushKV("txid", obj.txid.ToString());
+        // TODO
+        //CHivemindAddress addr;
+        //if (addr.Set(obj.keyID))
+        //    item.pushKV("keyID", addr.ToString());
+        item.pushKV("branchid", obj.branchid.ToString());
+        item.pushKV("prompt", obj.prompt);
+        item.pushKV("eventoverby", (int)obj.eventOverBy);
+        item.pushKV("isScaled", (int)obj.isScaled);
+        item.pushKV("min", ValueFromAmount(obj.min));
+        item.pushKV("max", ValueFromAmount(obj.max));
+        item.pushKV("answerOptionality", (int)obj.answerOptionality);
+        array.push_back(item);
+    }
+    obj.pushKV("decisions", array);
+
+    return obj;
+}
+
+UniValue getnewvotecoinaddress(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "getnewvotecoinaddress\n"
+            "\nReturns a new Votecoin address.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. account          (optional, string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    // TODO
+    /*
+    // Parse the account first so we don't generate a key if there's an error
+    string strAccount;
+    if (params.size() > 0)
+        strAccount = AccountFromValue(params[0]);
+
+    if (!pwalletMain->IsLocked())
+        pwalletMain->TopUpKeyPool();
+
+    // Generate a new key that is added to wallet
+    CPubKey newKey;
+    if (!pwalletMain->GetKeyFromPool(newKey))
+        throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+    CKeyID keyID = newKey.GetID();
+
+    pwalletMain->SetAddressBook(keyID, strAccount, "receive");
+
+    // Create a Votecoin address from the new key
+    CHivemindAddress votecoinAddress;
+    votecoinAddress.is_votecoin = 1;
+    votecoinAddress.Set(keyID);
+
+    return votecoinAddress.ToString();
+    */
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("address", "");
+
+    return obj;
+}
+
+UniValue getcreatetradecapitalrequired(const JSONRPCRequest& request)
+{
+    CWallet * const pwallet = GetWalletForJSONRPCRequest(request);
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
+        return NullUniValue;
+    }
+
+    if (request.fHelp || request.params.size() != 4)
+        throw std::runtime_error(
+            "getcreatetradecapitalrequired\n"
+            "\nReturns the capital required to trade.\n"
+            + HelpRequiringPassphrase(pwallet) +
+            "\nArguments:\n"
+            "\n1. marketid          (u256 string)"
+            "\n1. buyorsell         (string)"
+            "\n1. numbershares      (numeric)"
+            "\n1. decisionstate     (string)"
+            "\nResult:\n"
+            "\"\"                  (string) .\n"
+            "\nExamples:\n"
+            + HelpExampleCli("", "")
+            + HelpExampleRpc("", "")
+        );
+
+    if (!pmarkettree) {
+        string strError = std::string("Error: NULL pmarkettree!");
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    /* double-check buy_or_sell */
+    string buy_or_sell = request.params[1].get_str();
+    bool isBuy = (buy_or_sell == "buy");
+    bool isSell = (buy_or_sell == "sell");
+    if (!isBuy && !isSell) {
+        string strError = std::string("Error: '")
+            + buy_or_sell + "' must be buy or sell!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    /* double-check dnShares */
+    if (request.params[2].get_real() <= 0.0) {
+        char tmp[32];
+        snprintf(tmp, sizeof(tmp), "%.8f", request.params[2].get_real());
+        string strError = std::string("Error: number of shares ")
+            + tmp + " must be positive!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+    uint64_t dnShares = (uint64_t)request.params[2].get_int();
+
+    uint256 marketid;
+    marketid.SetHex(request.params[0].get_str());
+
+    marketMarket market;
+    if (!pmarkettree->GetMarket(marketid, market)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Vote not found!\n");
+    }
+
+    uint32_t nStates = marketNStates(market);
+
+    /* double-check decisionState */
+    uint32_t decisionState = request.params[3].get_int();
+    if (decisionState >= nStates) {
+        char tmp0[32];
+        snprintf(tmp0, sizeof(tmp0), "%u", decisionState);
+        char tmp1[32];
+        snprintf(tmp1, sizeof(tmp1), "%u", nStates);
+        string strError = std::string("Error: decision state ")
+            + tmp0 + " is above the number of states "
+            + tmp1 + " in the market!";
+        throw JSONRPCError(RPC_WALLET_ERROR, strError.c_str());
+    }
+
+    /* trades of the market */
+    std::vector<marketTrade> vTrade = pmarkettree->GetTrades(marketid);
+
+    /* current share totals of the market */
+    double *nShares = new double [nStates];
+    marketNShares(vTrade, nStates, nShares);
+
+    /* current account value */
+    double currAccount = marketAccountValue(market.maxCommission, 1e-8*market.B, nStates, nShares);
+
+    /* new shares to be added to the market */
+    nShares[decisionState] += (isBuy)? 1e-8*dnShares: -1e-8*dnShares;
+    double nextAccount = marketAccountValue(market.maxCommission, 1e-8*market.B, nStates, nShares);
+
+    /* the price difference to move from the current to the new */
+    double price = (isBuy)? (nextAccount - currAccount) / (1e-8*dnShares)
+        : (currAccount - nextAccount) / (1e-8*dnShares);
+
+    /* round up because returing value is shown as a string */
+    price += 1e-8;
+
+    UniValue obj(UniValue::VOBJ);
+    obj.pushKV("marketid", marketid.ToString());
+    obj.pushKV("B", 1e-8*market.B);
+    obj.pushKV("buy_or_sell", buy_or_sell);
+    obj.pushKV("nShares", 1e-8*dnShares);
+    obj.pushKV("price", price);
+    obj.pushKV("total", (1e-8*dnShares)*price);
+
+    delete nShares;
+
+    return obj;
+}
+
 extern UniValue abortrescan(const JSONRPCRequest& request); // in rpcdump.cpp
 extern UniValue dumpprivkey(const JSONRPCRequest& request); // in rpcdump.cpp
 extern UniValue importprivkey(const JSONRPCRequest& request);
@@ -4104,6 +6040,36 @@ static const CRPCCommand commands[] =
     { "sidechain",          "createwithdrawal",                 &createwithdrawal,                      {"address","refundaddress","namount","nfee", "nmainchainfee"} },
     { "sidechain",          "createwithdrawalrefundrequest",    &createwithdrawalrefundrequest,         {"id"} },
     { "sidechain",          "refundallwithdrawals",             &refundallwithdrawals,                  {} },
+
+    { "hivemind",           "listbranches",                     &listbranches,                  {} },
+    { "hivemind",           "listdecisions",                    &listdecisions,             {"branchid"} },
+    { "hivemind",           "listmarkets",                      &listmarkets,                   {"decisionid"} },
+    { "hivemind",           "listoutcomes",                     &listoutcomes,                  {"branchid"} },
+    { "hivemind",           "listtrades",                       &listtrades,                    {"marketid"} },
+    { "hivemind",           "listvotes",                        &listvotes,                     {"branchid", "height"} },
+
+    { "hivemind",           "createbranch",                     &createbranch,                  {"name","description","baselistingfee","freedecisions","targetdecisions","maxdecisions","mintradingfee","tau","ballottime","unsealtime","consensusthreshold","alpha","tol"} },
+    { "hivemind",           "createdecision",                   &createdecision,                {"address","branchid","prompt","eventoverby","answeroptionality","isscaled","scaledmin","scaledmax"} },
+    { "hivemind",           "createmarket",                     &createmarket,                  {"address","decisionids","B","tradingfee","maxcomission","title","description","tags","maturation","powhashid","powdiff"} },
+    { "hivemind",           "createtrade",                      &createtrade,                   {"address","marketid","buyorsell","numbershares","price","decisionstate","nonce"} },
+    { "hivemind",           "createsealedvote",                 &createsealedvote,              {"branchid","height","voteid"} },
+    { "hivemind",           "createstealvote",                  &createstealvote ,              {"branchid","height","voteid"} },
+    { "hivemind",           "createrevealvote",                 &createrevealvote,              {"address","branchid","height","voteid","na","votes"} },
+
+    { "hivemind",           "getbranch",                        &getbranch,                     {"branchid"} },
+    { "hivemind",           "getdecision",                      &getdecision,                   {"decisionid"} },
+    { "hivemind",           "getmarket",                        &getmarket,                     {"marketid"} },
+    { "hivemind",           "getoutcome",                       &getoutcome,                    {"outcomeid"} },
+    { "hivemind",           "gettrade",                         &gettrade,                      {"tradeid"} },
+    { "hivemind",           "getsealedvote",                    &getsealedvote,                 {"voteid"} },
+    { "hivemind",           "getrevealvote",                    &getrevealvote,                 {"voteid"} },
+    { "hivemind",           "getstealvote",                     &getstealvote,                  {"voteid"} },
+    { "hivemind",           "getballot",                        &getballot,                     {"branchid", "height"} },
+    { "hivemind",           "getnewvotecoinaddress",            &getnewvotecoinaddress,         {"account"} },
+
+    { "hivemind",           "getcreatetradecapitalrequired",    &getcreatetradecapitalrequired, {"marketid","buyorsell","numbershares","decisionstate"} },
+
+
 };
 
 void RegisterWalletRPCCommands(CRPCTable &t)
