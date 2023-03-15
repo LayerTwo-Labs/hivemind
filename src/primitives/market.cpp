@@ -232,18 +232,15 @@ string marketTrade::ToString(void) const
     return str.str();
 }
 
-uint32_t marketNStates(const marketMarket *market)
+uint32_t marketNStates(const marketMarket& market)
 {
-    if (!market)
-        return 0; /* error */
-
     uint32_t nStates = 1;
-    for(uint32_t i=0; i < market->decisionIDs.size(); i++)
+    for(uint32_t i=0; i < market.decisionIDs.size(); i++)
         nStates *= 2;
     return nStates;
 }
 
-int marketNShares(const vector<marketTrade *> &trades, uint32_t nStates,
+int marketNShares(const vector<marketTrade> &trades, uint32_t nStates,
     double *nShares)
 {
     if (nShares)
@@ -253,10 +250,10 @@ int marketNShares(const vector<marketTrade *> &trades, uint32_t nStates,
         nShares[i] = 0.0;
 
     for(uint32_t i=0; i < trades.size(); i++) {
-        const marketTrade *trade = trades[i];
-        uint32_t state = trade->decisionState;
+        const marketTrade trade = trades[i];
+        uint32_t state = trade.decisionState;
         if (state < nStates)
-           nShares[state] += (trade->isBuy)? trade->nShares: -trade->nShares;
+           nShares[state] += (trade.isBuy)? trade.nShares: -trade.nShares;
     }
 
     for(uint32_t i=0; i < nStates; i++)

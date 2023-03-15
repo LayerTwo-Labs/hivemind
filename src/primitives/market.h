@@ -160,9 +160,9 @@ struct marketMarket : public marketObj {
 };
 
 /* query the number of states in the market */
-uint32_t marketNStates(const marketMarket *);
+uint32_t marketNStates(const marketMarket& market);
 /* query the nShares in each state from the set of trades */
-int marketNShares(const vector<marketTrade *> &trades, uint32_t nStates, double *nShares);
+int marketNShares(const vector<marketTrade> &trades, uint32_t nStates, double *nShares);
 /* query the account value when given the nshares in each state */
 double marketAccountValue(double maxCommission, double B, uint32_t nStates, const double *nShares);
 
