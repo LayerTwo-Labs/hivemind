@@ -121,6 +121,7 @@ BitcoinGUI::BitcoinGUI(const PlatformStyle *_platformStyle, const NetworkStyle *
     sidechainAction(0),
     showHashCalcDialogAction(0),
     showBlockExplorerDialogAction(0),
+    hivemindMarketsAction(0),
     trayIcon(0),
     trayIconMenu(0),
     notificator(0),
@@ -330,6 +331,13 @@ void BitcoinGUI::createActions()
     historyAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_5));
     tabGroup->addAction(historyAction);
 
+    hivemindMarketsAction = new QAction(platformStyle->SingleColorIcon(":/icons/market"), tr("&Markets"), this);
+    hivemindMarketsAction->setStatusTip(tr("Show markets page"));
+    hivemindMarketsAction->setToolTip(hivemindMarketsAction->statusTip());
+    hivemindMarketsAction->setCheckable(true);
+    hivemindMarketsAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_6));
+    tabGroup->addAction(hivemindMarketsAction);
+
 #ifdef ENABLE_WALLET
     connect(sidechainAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(sidechainAction, SIGNAL(triggered()), this, SLOT(gotoSidechainPage()));
@@ -348,6 +356,8 @@ void BitcoinGUI::createActions()
     connect(receiveCoinsMenuAction, SIGNAL(triggered()), this, SLOT(gotoReceiveCoinsPage()));
     connect(historyAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(historyAction, SIGNAL(triggered()), this, SLOT(gotoHistoryPage()));
+    connect(hivemindMarketsAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(hivemindMarketsAction, SIGNAL(triggered()), this, SLOT(gotoMarketsPage()));
 #endif // ENABLE_WALLET
 
     quitAction = new QAction(platformStyle->TextColorIcon(":/icons/quit"), tr("E&xit"), this);
@@ -501,6 +511,8 @@ void BitcoinGUI::createToolBars()
         toolbar->addAction(sendCoinsAction);
         toolbar->addAction(receiveCoinsAction);
         toolbar->addAction(historyAction);
+        toolbar->addSeparator();
+        toolbar->addAction(hivemindMarketsAction);
         overviewAction->setChecked(true);
     }
 }
@@ -599,6 +611,7 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
     receiveCoinsAction->setEnabled(enabled);
     receiveCoinsMenuAction->setEnabled(enabled);
     historyAction->setEnabled(enabled);
+    hivemindMarketsAction->setEnabled(enabled);
     encryptWalletAction->setEnabled(enabled);
     backupWalletAction->setEnabled(enabled);
     changePassphraseAction->setEnabled(enabled);
@@ -769,6 +782,11 @@ void BitcoinGUI::showBlockExplorerDialog()
 {
     blockExplorerDialog->show();
     blockExplorerDialog->scrollRight();
+}
+void BitcoinGUI::gotoMarketsPage()
+{
+    hivemindMarketsAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoMarketsPage();
 }
 #endif // ENABLE_WALLET
 

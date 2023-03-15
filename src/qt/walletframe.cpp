@@ -159,6 +159,13 @@ void WalletFrame::gotoSidechainPage()
         i.value()->gotoSidechainPage();
 }
 
+void WalletFrame::gotoMarketsPage()
+{
+    QMap<QString, WalletView*>::const_iterator i;
+    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
+        i.value()->gotoMarketsPage();
+}
+
 void WalletFrame::encryptWallet(bool status)
 {
     WalletView *walletView = currentWalletView();

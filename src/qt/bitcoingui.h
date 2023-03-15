@@ -116,6 +116,7 @@ private:
     QAction *sidechainAction;
     QAction *showHashCalcDialogAction;
     QAction *showBlockExplorerDialogAction;
+    QAction *hivemindMarketsAction;
 
     QSystemTrayIcon *trayIcon;
     QMenu *trayIconMenu;
@@ -211,6 +212,8 @@ private Q_SLOTS:
     void gotoReceiveCoinsPage();
     /** Switch to send coins page */
     void gotoSendCoinsPage(QString addr = "");
+    /** Switch to hivemind markets page */
+    void gotoMarketsPage();
 
     /** Show Sign/Verify Message dialog and switch to sign message tab */
     void gotoSignMessageTab(QString addr = "");

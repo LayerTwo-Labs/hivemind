@@ -9,6 +9,7 @@
 #include <qt/bitcoingui.h>
 #include <qt/clientmodel.h>
 #include <qt/guiutil.h>
+#include <qt/marketspage.h>
 #include <qt/optionsmodel.h>
 #include <qt/overviewpage.h>
 #include <qt/platformstyle.h>
@@ -56,11 +57,14 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
 
     sidechainPage = new SidechainPage(platformStyle, this);
 
+    marketsPage = new MarketsPage(this);
+
     addWidget(sidechainPage);
     addWidget(overviewPage);
     addWidget(transactionsPage);
     addWidget(receiveCoinsPage);
     addWidget(sendCoinsPage);
+    addWidget(marketsPage);
 
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
     connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
@@ -216,6 +220,11 @@ void WalletView::gotoVerifyMessageTab(QString addr)
 void WalletView::gotoSidechainPage()
 {
     setCurrentWidget(sidechainPage);
+}
+
+void WalletView::gotoMarketsPage()
+{
+    setCurrentWidget(marketsPage);
 }
 
 bool WalletView::handlePaymentRequest(const SendCoinsRecipient& recipient)

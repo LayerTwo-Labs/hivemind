@@ -107,6 +107,7 @@ QT_FORMS_UI = \
   qt/forms/helpmessagedialog.ui \
   qt/forms/intro.ui \
   qt/forms/manualbmmdialog.ui \
+  qt/forms/marketspage.ui \
   qt/forms/merkletreedialog.ui \
   qt/forms/openuridialog.ui \
   qt/forms/optionsdialog.ui \
@@ -149,6 +150,7 @@ QT_MOC_CPP = \
   qt/moc_manualbmmdialog.cpp \
   qt/moc_macdockiconhandler.cpp \
   qt/moc_macnotificationhandler.cpp \
+  qt/moc_marketspage.cpp \
   qt/moc_merkletreedialog.cpp \
   qt/moc_notificator.cpp \
   qt/moc_openuridialog.cpp \
@@ -232,6 +234,7 @@ BITCOIN_QT_H = \
   qt/manualbmmdialog.h \
   qt/macdockiconhandler.h \
   qt/macnotificationhandler.h \
+  qt/marketspage.h \
   qt/merkletreedialog.h \
   qt/networkstyle.h \
   qt/notificator.h \
@@ -381,6 +384,7 @@ BITCOIN_QT_WALLET_CPP = \
   qt/confgeneratordialog.cpp \
   qt/coincontroltreewidget.cpp \
   qt/editaddressdialog.cpp \
+  qt/marketspage.cpp \
   qt/merkletreedialog.cpp \
   qt/openuridialog.cpp \
   qt/overviewpage.cpp \

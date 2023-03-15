@@ -20,6 +20,7 @@ class SidechainPage;
 class TransactionView;
 class WalletModel;
 class AddressBookPage;
+class MarketsPage;
 
 QT_BEGIN_NAMESPACE
 class QModelIndex;
@@ -66,6 +67,7 @@ private:
     AddressBookPage *usedSendingAddressesPage;
     AddressBookPage *usedReceivingAddressesPage;
     SidechainPage *sidechainPage;
+    MarketsPage *marketsPage;
 
     TransactionView *transactionView;
 
@@ -88,6 +90,8 @@ public Q_SLOTS:
     void gotoVerifyMessageTab(QString addr = "");
     /** Switch to sidechain page */
     void gotoSidechainPage();
+    /** Switch to markets page */
+    void gotoMarketsPage();
 
     /** Show incoming transaction notification for new transactions.
 
