@@ -81,8 +81,13 @@ void getBranchOutcome(CMutableTransaction &tx, marketBranch branch, uint32_t hei
     /* Make sure the current height is a factor of tau */
     if (height % branch.tau) return;
 
+    LogPrintf("%s: Miner generating outcomes for branch %s for period ending at height %u\n", __func__, branch.GetHash().ToString(), height);
+
     /* Retrieve the votes for this height. */
     vector<marketRevealVote> revealvotes = pmarkettree->GetRevealVotes(branch.GetHash(), height);
+
+    LogPrintf("%s: Total reveal votes: %u\n", __func__, revealvotes.size());
+
     /* Create a map of new votes, indexed by their keyID(s) */
     map<CKeyID, marketRevealVote> voteMap;
     for(size_t i=0; i < revealvotes.size(); i++)
@@ -105,8 +110,13 @@ void getBranchOutcome(CMutableTransaction &tx, marketBranch branch, uint32_t hei
     uint32_t maxHeight = height; // Max = the current height, which is a multiple of tau.
     uint32_t minHeight = maxHeight - (branch.tau - 1); // Min = the begining of this tau period
 
+    LogPrintf("%s: Decision ending time range: %u -> %u\n", __func__, minHeight, maxHeight);
+
     /* Get the list of decisions on the branch, and create decisionMap */
     vector<marketDecision> decisions = pmarkettree->GetDecisions(branch.GetHash());
+
+    LogPrintf("%s: Total decisions: %u\n", __func__, decisions.size());
+
     map<uint256, marketDecision> decisionMap;
     for(size_t i=0; i < decisions.size(); i++)
         decisionMap[ decisions[i].GetHash() ] = decisions[i];
@@ -127,6 +137,8 @@ void getBranchOutcome(CMutableTransaction &tx, marketBranch branch, uint32_t hei
 
     /* Get the list of previous outcomes on this branch */
     vector<marketOutcome> outcomes = pmarkettree->GetOutcomes(branch.GetHash());
+
+    LogPrintf("%s: Number of previous branch outcomes: %u\n", __func__, outcomes.size());
 
     /* Try to find the previous outcome transaction */
     CTransactionRef previousOutcomeTx;
@@ -184,6 +196,8 @@ void getBranchOutcome(CMutableTransaction &tx, marketBranch branch, uint32_t hei
         }
     }
 
+    LogPrintf("%s: Number of outcome voters: %u\n", __func__, outcome->nVoters);
+
     /* Calculate new outcome, add reputation payouts to transaction */
     if (outcome->nVoters) {
         int ret = outcome->calc();
@@ -213,6 +227,7 @@ void getBranchOutcome(CMutableTransaction &tx, marketBranch branch, uint32_t hei
             markets.push_back(decisionMarkets.at(y));
         }
     }
+    LogPrintf("%s: Number of markets on branch: %u\n", __func__, markets.size());
 
     /* find which markets have just ended */
     uint32_t nMarketsEnded = 0; // Count of markets that have ended
@@ -231,6 +246,8 @@ void getBranchOutcome(CMutableTransaction &tx, marketBranch branch, uint32_t hei
             nMarketsEnded++;
         }
     }
+
+    LogPrintf("%s: Number of markets that have ended: %u\n", __func__, nMarketsEnded);
 
     /* If markets have ended, calculate the payouts */
     if (nMarketsEnded) {
@@ -278,6 +295,7 @@ void getBranchOutcome(CMutableTransaction &tx, marketBranch branch, uint32_t hei
 
             /* the trades */
             vector<marketTrade> trades = pmarkettree->GetTrades(markets[i].GetHash());
+            LogPrintf("%s: Number of trades for market %s: %u\n", __func__, markets[i].GetHash().ToString(), trades.size());
             for(uint32_t j=0; j < trades.size(); j++) {
                 if (!trades[j].isBuy)
                     continue;
