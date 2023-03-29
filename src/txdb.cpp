@@ -1005,19 +1005,14 @@ CMarketTreeDB::GetRevealVotes(const uint256 & /* branchid */ id, uint32_t height
 
         pair<pair<char, uint256>, uint32_t> key;
         marketRevealVote vote;
-        if (pcursor->GetKey(key)) {
-            if (key.first.first != op)
-                continue;
-            if (key.first.second != id)
-                continue;
-            if (key.second != height)
-                continue;
-
+        if (pcursor->GetKey(key) && key.first.first == op &&
+                key.first.second == id && key.second == height) {
             vVote.push_back(vote);
         }
 
         pcursor->Next();
     }
+
     return vVote;
 }
 
@@ -1037,19 +1032,14 @@ CMarketTreeDB::GetSealedVotes(const uint256 & /* branchid */ id, uint32_t height
 
         pair<pair<char, uint256>, uint32_t> key;
         marketSealedVote vote;
-        if (pcursor->GetKey(key)) {
-            if (key.first.first != op)
-                continue;
-            if (key.first.second != id)
-                continue;
-            if (key.second != height)
-                continue;
-
+        if (pcursor->GetKey(key) && key.first.first == op
+                && key.first.second == id && key.second == height) {
             vVote.push_back(vote);
         }
 
         pcursor->Next();
     }
+
     return vVote;
 }
 
@@ -1069,19 +1059,14 @@ CMarketTreeDB::GetStealVotes(const uint256 & /* branchid */ id, uint32_t height)
 
         pair<pair<char, uint256>, uint32_t> key;
         marketStealVote vote;
-        if (pcursor->GetKey(key)) {
-            if (key.first.first != op)
-                continue;
-            if (key.first.second != id)
-                continue;
-            if (key.second != height)
-                continue;
-
+        if (pcursor->GetKey(key) && key.first.first == op
+                && key.first.second == id && key.second == height) {
             vVote.push_back(vote);
         }
 
         pcursor->Next();
     }
+
     return vVote;
 }
 
