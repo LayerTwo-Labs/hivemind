@@ -180,8 +180,6 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "createsealedvote", 1, "height" },
     { "createstealvote", 1, "height" },
     { "createrevealvote", 2, "height" },
-    { "createrevealvote", 4, "na" },
-    { "createrevealvote", 5, "votes" },
     { "getballot", 1, "height" },
     { "getcreatetradecapitalrequired", 1, "buyorsell" },
     { "getcreatetradecapitalrequired", 2, "numbershares" },
