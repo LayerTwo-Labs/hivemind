@@ -4780,9 +4780,21 @@ UniValue createtrade(const JSONRPCRequest& request)
     //    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,
     //        "Invalid Hivemind address");
     //address.GetKeyID(obj.keyID);
+    //
+    // Get address
+    CTxDestination dest = DecodeDestination(request.params[0].get_str());
+    if (!IsValidDestination(dest)) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Invalid address!");
+    }
 
+    // Double checking that the destination is for a KeyID
+    const CKeyID* id = boost::get<CKeyID>(&dest);
+    if (!id) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Invalid non P2PKH destination!");
+    }
+    trade.keyID = *id;
 
-        /* Add market id to the object, checked later (performance) */
+    /* Add market id to the object, checked later (performance) */
     trade.marketid.SetHex(request.params[1].get_str());
 
     /* double-check buy_or_sell */
@@ -5110,7 +5122,7 @@ UniValue createrevealvote(const JSONRPCRequest& request)
         return NullUniValue;
     }
 
-    if (request.fHelp || request.params.size() != 3)
+    if (request.fHelp || request.params.size() != 6)
         throw std::runtime_error(
             "createrevealvote\n"
             "\nReveal the vote from a sealed vote.\n"
