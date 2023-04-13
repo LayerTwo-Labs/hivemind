@@ -1,8 +1,5 @@
-# hivemind
-Knowledge Revolution
+# Hivemind - Knowledge Revolution
 
-Hivemind Notes
-==============
 
 Hivemind Markets (Hanson Market Maker)
 --------------------------------------
